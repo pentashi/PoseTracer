@@ -5,6 +5,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Play, MessageCircle, Target, Trophy, Zap, Activity, Heart, Dumbbell } from 'lucide-react';
 import heroFitness from '@/assets/hero-fitness.jpg';
+import Navigation from './Navigation'; // make sure the path is correct
 
 const Dashboard = () => {
   const workoutData = {
@@ -202,7 +203,16 @@ const Dashboard = () => {
           <Target className="mr-2 h-5 w-5" />
           View All Goals & Achievements
         </Button>
+        
       </div>
+<div className="min-h-screen bg-gradient-to-b from-cyber-darker to-background p-4 pb-24">
+ <Navigation 
+    currentView="dashboard" 
+    onViewChange={(view) => console.log('Navigate to', view)} 
+  />
+</div>
+
+      
     </div>
   );
 };
