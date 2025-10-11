@@ -3,18 +3,27 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import fetch from 'node-fetch';
-import fs from 'fs';
 import admin from 'firebase-admin';
 import { buildWorkoutPrompt } from './utils/promptBuilder.js';
 
 dotenv.config();
 
 // --------------------
-// 🔥 Initialize Firebase Admin
+// 🔥 Initialize Firebase Admin (ENV-based, no JSON file)
 // --------------------
-const serviceAccount = JSON.parse(
-  fs.readFileSync(new URL('./serviceAccountKey.json', import.meta.url))
-);
+const serviceAccount = {
+  type: 'service_account',
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+  private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  client_id: process.env.FIREBASE_CLIENT_ID,
+  auth_uri: process.env.FIREBASE_AUTH_URI,
+  token_uri: process.env.FIREBASE_TOKEN_URI,
+  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
+  universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN || 'googleapis.com',
+};
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -37,16 +46,19 @@ app.use((req, res, next) => {
   next();
 });
 
+// --------------------
+// 🧠 Groq Setup
+// --------------------
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 if (!GROQ_API_KEY) {
-  console.error('❌ GROQ_API_KEY missing from .env');
+  console.error('❌ GROQ_API_KEY missing from environment.');
   process.exit(1);
 }
 
 // --------------------
-// 🧠 Helper Functions
+// 💬 Chat Endpoint
 // --------------------
 async function getChatHistory(userId) {
   const chatRef = db.collection('users').doc(userId).collection('chatHistory');
@@ -59,9 +71,7 @@ async function getUserProfile(userId) {
   const userSnap = await userRef.get();
   return userSnap.exists ? userSnap.data() : {};
 }
-// --------------------
-// 💬 Chat Endpoint (with duplicate protection)
-// --------------------
+
 app.post('/chat', async (req, res) => {
   console.log('🛰️ Received /chat request:', new Date().toISOString());
   const { message, userId } = req.body;
@@ -97,8 +107,6 @@ Always remember the chat history and speak naturally, confidently, and motivatio
       max_tokens: 1000,
     };
 
-    console.log('➡️ Sending to Groq API:', JSON.stringify(payload, null, 2));
-
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
@@ -118,20 +126,17 @@ Always remember the chat history and speak naturally, confidently, and motivatio
     const reply = data.choices?.[0]?.message?.content || 'No response from AI';
     console.log('✅ Groq reply:', reply);
 
-    // 🔒 Prevent duplicate AI responses
+    // Save to Firestore if not duplicate
     const chatRef = db.collection('users').doc(userId).collection('chatHistory');
     const lastMessages = await chatRef.orderBy('timestamp', 'desc').limit(1).get();
     const lastMsg = lastMessages.docs[0]?.data();
 
-    if (lastMsg?.type === 'ai' && lastMsg?.message === reply) {
-      console.log('🟡 Skipping duplicate AI reply');
-    } else {
+    if (!lastMsg || lastMsg.message !== reply) {
       await chatRef.add({
         type: 'ai',
         message: reply,
         timestamp: Date.now(),
       });
-      console.log('✅ AI reply saved to Firestore');
     }
 
     res.json({ reply });
@@ -140,7 +145,6 @@ Always remember the chat history and speak naturally, confidently, and motivatio
     res.status(500).json({ error: 'Internal server error.' });
   }
 });
-
 
 // --------------------
 // 🏋️ Workout Endpoint
@@ -164,8 +168,6 @@ app.post('/generate-workout', async (req, res) => {
       temperature: 0.7,
       max_tokens: 1500,
     };
-
-    console.log('➡️ Sending workout prompt:', JSON.stringify(payload, null, 2));
 
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
