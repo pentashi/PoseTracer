@@ -1,20 +1,19 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Home, MessageCircle, Activity, BarChart3, Settings, Target } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
-interface NavigationProps {
-  currentView: string;
-  onViewChange: (view: string) => void;
-}
+const Navigation: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
 
-const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
   const navItems = [
-    { id: 'dashboard', icon: Home, label: 'Dashboard' },
-    { id: 'chat', icon: MessageCircle, label: 'AI Coach' },
-    { id: 'planner', icon: Target, label: 'Planner' },
-    { id: 'workout', icon: Activity, label: 'Workout' },
-    { id: 'progress', icon: BarChart3, label: 'Progress' },
-    { id: 'settings', icon: Settings, label: 'Settings' }
+    { id: 'dashboard', icon: Home, label: 'Dashboard', path: '/dashboard' },
+    { id: 'chat', icon: MessageCircle, label: 'AI Coach', path: '/ai-coach' },
+    { id: 'planner', icon: Target, label: 'Planner', path: '/planner' },
+    { id: 'workout', icon: Activity, label: 'Workout', path: '/workout' },
+    { id: 'progress', icon: BarChart3, label: 'Progress', path: '/progress' },
+    { id: 'settings', icon: Settings, label: 'Settings', path: '/settings' }
   ];
 
   return (
@@ -22,8 +21,8 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
       <div className="flex items-center justify-between max-w-md mx-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = currentView === item.id;
-          
+          const isActive = location.pathname === item.path;
+
           return (
             <Button
               key={item.id}
@@ -32,7 +31,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
               className={`flex flex-col items-center space-y-1 h-auto py-2 px-3 ${
                 isActive ? 'ai-glow' : ''
               }`}
-              onClick={() => onViewChange(item.id)}
+              onClick={() => navigate(item.path)}
             >
               <Icon className={`h-4 w-4 ${isActive ? 'text-cyber-dark' : 'text-neon-purple'}`} />
               <span className={`text-xs ${

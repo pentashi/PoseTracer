@@ -1,183 +1,308 @@
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { User, Bot, Watch, Shield, Download, Mic, Camera, Bell, Zap } from 'lucide-react';
+// src/components/Settings.tsx
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { User, Bot, Watch, Shield, Download } from "lucide-react";
 
-const Settings = () => {
-  const profileData = {
-    name: "Alex Chen",
-    age: 28,
-    height: "5'10\"",
-    weight: "168 lbs",
-    fitnessLevel: "Intermediate",
-    goals: ["Build Muscle", "Lose Fat"],
-    injuries: ["Lower Back (Minor)"]
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getUserSettings, updateUserSettings } from "@/services/userService";
+import { auth } from "@/firebaseConfig";
+import { toast } from "sonner";
+
+
+const Settings: React.FC = () => {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+// Redirect to login if no user is logged in
+  useEffect(() => {
+    if (!auth.currentUser) {
+      navigate("/login");
+    }
+  }, [navigate]);
+const handleLogout = async () => {
+  try {
+    await auth.signOut();
+    queryClient.clear(); // clear all cached queries
+    navigate("/login");
+    toast.success("Logged out successfully");
+  } catch (err) {
+    console.error("Logout failed:", err);
+    toast.error("Logout failed, try again");
+  }
+};
+
+
+
+  const [profile, setProfile] = useState<any>(null);
+  const [aiSettings, setAiSettings] = useState<any>({});
+  const [privacySettings, setPrivacySettings] = useState<any>({});
+  const [deviceIntegrations, setDeviceIntegrations] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any>({});
+  const [workoutPlan, setWorkoutPlan] = useState<any>(null);
+
+  const [editingProfile, setEditingProfile] = useState(false);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["userSettings"],
+    queryFn: getUserSettings,
+    enabled: !!auth.currentUser,
+    onError: (err: any) => {
+      console.error("Error loading settings:", err);
+      toast.error("Failed to load settings");
+    },
+  });
+
+  const mutation = useMutation({
+    mutationFn: (updates: any) => updateUserSettings(updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userSettings"] });
+      toast.success("Saved");
+    },
+    onError: (err: any) => {
+      console.error("Failed to save settings:", err);
+      toast.error("Save failed");
+    },
+  });
+
+  useEffect(() => {
+    if (!data) return;
+
+    setProfile({
+      name: data.name ?? data.profile?.name ?? "",
+      age: data.age ?? data.profile?.age ?? "",
+      height: data.height ?? data.profile?.height ?? "",
+      weight: data.weight ?? data.profile?.weight ?? "",
+      equipment: data.equipment ?? data.profile?.equipment ?? "",
+      experienceLevel: data.experienceLevel ?? data.profile?.experienceLevel ?? "",
+      trainingDaysPerWeek: data.trainingDaysPerWeek ?? data.profile?.trainingDaysPerWeek ?? "",
+      fitnessGoals: Array.isArray(data.fitnessGoals)
+        ? data.fitnessGoals
+        : data.fitnessGoals
+        ? [data.fitnessGoals]
+        : data.profile?.fitnessGoals ?? [],
+      injuries: Array.isArray(data.injuries)
+        ? data.injuries
+        : data.injuries
+        ? [data.injuries]
+        : data.profile?.injuries ?? [],
+      email: data.email ?? "",
+    });
+
+    setAiSettings(data.aiSettings ?? {});
+    setPrivacySettings(data.privacySettings ?? data.privacy ?? {});
+    setDeviceIntegrations(data.deviceIntegrations ?? data.devices ?? []);
+    setNotifications(data.notifications ?? {});
+    setWorkoutPlan(data.workoutPlan ?? null);
+  }, [data]);
+
+  const handleSaveProfile = async () => {
+    if (!profile) return;
+
+    const updates: any = {
+      name: profile.name,
+      age: profile.age ? Number(profile.age) : null,
+      height: profile.height ? Number(profile.height) : null,
+      weight: profile.weight ? Number(profile.weight) : null,
+      equipment: profile.equipment ?? null,
+      experienceLevel: profile.experienceLevel ?? null,
+      trainingDaysPerWeek: profile.trainingDaysPerWeek ?? null,
+      fitnessGoals: Array.isArray(profile.fitnessGoals)
+        ? profile.fitnessGoals
+        : (profile.fitnessGoals || "").split(",").map((s: string) => s.trim()).filter(Boolean),
+      injuries: Array.isArray(profile.injuries)
+        ? profile.injuries
+        : (profile.injuries || "").split(",").map((s: string) => s.trim()).filter(Boolean),
+    };
+
+    try {
+      await mutation.mutateAsync(updates);
+      setEditingProfile(false);
+    } catch {}
   };
 
-  const aiSettings = {
-    voiceStyle: "motivational",
-    analysisDepth: "detailed",
-    formCorrections: true,
-    nutritionAdvice: true,
-    recoveryTracking: true
+  const saveNotifications = async (newNotifications: any) => {
+    setNotifications(newNotifications);
+    await mutation.mutateAsync({ notifications: newNotifications });
   };
 
-  const privacySettings = {
-    dataSharing: false,
-    analytics: true,
-    photoStorage: true,
-    voiceRecording: true
+  const handleExport = () => {
+    const payload = data ?? {};
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `user-${auth.currentUser?.uid ?? "settings"}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Export started");
   };
 
-  const deviceIntegrations = [
-    { name: "Apple Watch", connected: true, battery: 85, status: "syncing" },
-    { name: "MyFitnessPal", connected: true, status: "active" },
-    { name: "Strava", connected: false, status: "disconnected" },
-    { name: "Fitbit", connected: false, status: "available" }
-  ];
+  const viewWorkoutPlan = () => {
+    navigate("/generated-workout", { state: { workoutPlan } });
+  };
+
+  if (isLoading) return <p className="text-white text-center mt-12">Loading settings...</p>;
+  if (isError) return <p className="text-red-400 text-center mt-12">Error loading settings</p>;
+  if (!profile) return <p className="text-white text-center mt-12">No profile data</p>;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-cyber-darker to-background p-4 pb-24">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-neon-purple">Settings</h1>
-          <p className="text-sm text-neon-blue">Customize your AI fitness experience</p>
-        </div>
-        <Button variant="cyber">
-          <Download className="mr-2 h-4 w-4" />
-          Export Data
-        </Button>
-      </div>
+  <div>
+    <h1 className="text-2xl font-bold text-neon-purple">Settings</h1>
+    <p className="text-sm text-neon-blue">Customize your AI fitness experience</p>
+  </div>
+  <div className="flex gap-2">
+    <Button variant="ghost_cyber" onClick={handleExport}>
+      <Download className="mr-2 h-4 w-4" />
+      Export Data
+    </Button>
+    <Button variant="destructive" onClick={handleLogout}>
+      Logout
+    </Button>
+  </div>
+</div>
 
-      {/* Profile Settings */}
+
+      {/* Profile Card */}
       <Card className="cyber-card p-6 mb-6">
         <div className="flex items-center space-x-3 mb-4">
           <User className="h-6 w-6 text-neon-purple" />
-          <h3 className="text-lg font-bold text-white">Profile Settings</h3>
+          <h3 className="text-lg font-bold text-white">Profile</h3>
         </div>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Name</p>
-              <p className="font-medium text-white">{profileData.name}</p>
+        {!editingProfile ? (
+          <>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Name</p>
+                <p className="font-medium text-white">{profile.name || "—"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Age</p>
+                <p className="font-medium text-white">{profile.age || "—"} years</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Height (cm)</p>
+                <p className="font-medium text-white">{profile.height ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Weight (kg)</p>
+                <p className="font-medium text-white">{profile.weight ?? "—"}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Age</p>
-              <p className="font-medium text-white">{profileData.age} years</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Height</p>
-              <p className="font-medium text-white">{profileData.height}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Weight</p>
-              <p className="font-medium text-white">{profileData.weight}</p>
-            </div>
-          </div>
 
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Fitness Goals</p>
-            <div className="flex flex-wrap gap-2">
-              {profileData.goals.map((goal, idx) => (
-                <Badge key={idx} className="bg-neon-green text-cyber-dark">
-                  {goal}
-                </Badge>
-              ))}
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground mb-2">Goals</p>
+              <div className="flex flex-wrap gap-2">
+                {(profile.fitnessGoals || []).map((g: string, i: number) => (
+                  <Badge key={i} className="bg-neon-green text-cyber-dark">{g}</Badge>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Injuries/Limitations</p>
-            <div className="flex flex-wrap gap-2">
-              {profileData.injuries.map((injury, idx) => (
-                <Badge key={idx} className="bg-neon-pink text-cyber-dark">
-                  {injury}
-                </Badge>
-              ))}
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground mb-2">Injuries</p>
+              <div className="flex flex-wrap gap-2">
+                {(profile.injuries || []).map((i: string, idx: number) => (
+                  <Badge key={idx} className="bg-neon-pink text-cyber-dark">{i}</Badge>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <Button variant="ghost_cyber" className="w-full">
-            Edit Profile
-          </Button>
-        </div>
+            <div className="flex gap-2">
+              <Button variant="ghost_cyber" onClick={() => setEditingProfile(true)}>Edit Profile</Button>
+              <Button variant="neon" onClick={viewWorkoutPlan}>View Workout Plan</Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Name</p>
+                <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Age</p>
+                <Input type="number" value={profile.age} onChange={(e) => setProfile({ ...profile, age: e.target.value })} />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Height (cm)</p>
+                <Input type="number" value={profile.height} onChange={(e) => setProfile({ ...profile, height: e.target.value })} />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Weight (kg)</p>
+                <Input type="number" value={profile.weight} onChange={(e) => setProfile({ ...profile, weight: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Equipment</p>
+                <Input value={profile.equipment} onChange={(e) => setProfile({ ...profile, equipment: e.target.value })} />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Experience Level</p>
+                <Select value={profile.experienceLevel || ""} onValueChange={(val) => setProfile({ ...profile, experienceLevel: val })}>
+                  <SelectTrigger className="w-full bg-cyber-light border-neon-blue/30">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-cyber-light border-neon-blue/30">
+                    <SelectItem value="beginner">Beginner</SelectItem>
+                    <SelectItem value="intermediate">Intermediate</SelectItem>
+                    <SelectItem value="advanced">Advanced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground mb-2">Goals (comma separated)</p>
+              <Input
+                value={Array.isArray(profile.fitnessGoals) ? profile.fitnessGoals.join(", ") : profile.fitnessGoals || ""}
+                onChange={(e) => setProfile({ ...profile, fitnessGoals: e.target.value })}
+              />
+            </div>
+
+            <div className="mb-4">
+              <p className="text-sm text-muted-foreground mb-2">Injuries (comma separated)</p>
+              <Input
+                value={Array.isArray(profile.injuries) ? profile.injuries.join(", ") : profile.injuries || ""}
+                onChange={(e) => setProfile({ ...profile, injuries: e.target.value })}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="ghost_cyber" onClick={() => setEditingProfile(false)}>Cancel</Button>
+              <Button variant="neon" onClick={handleSaveProfile}>Save Profile</Button>
+            </div>
+          </>
+        )}
       </Card>
 
-      {/* AI Coach Settings */}
+      {/* Workout Plan */}
       <Card className="cyber-card p-6 mb-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <Bot className="h-6 w-6 text-neon-blue ai-glow" />
-          <h3 className="text-lg font-bold text-white">AI Coach Settings</h3>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-3">
+            <Bot className="h-6 w-6 text-neon-blue ai-glow" />
+            <h3 className="text-lg font-bold text-white">Generated Workout Plan</h3>
+          </div>
+          <Button variant="cyber" onClick={viewWorkoutPlan}>Open</Button>
         </div>
-
-        <div className="space-y-6">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-white">Voice Style</p>
-              <Select defaultValue={aiSettings.voiceStyle}>
-                <SelectTrigger className="w-32 bg-cyber-light border-neon-blue/30">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-cyber-light border-neon-blue/30">
-                  <SelectItem value="calm">Calm</SelectItem>
-                  <SelectItem value="motivational">Motivational</SelectItem>
-                  <SelectItem value="technical">Technical</SelectItem>
-                  <SelectItem value="friendly">Friendly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-xs text-muted-foreground">Choose how your AI coach communicates</p>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-white">Analysis Depth</p>
-              <Select defaultValue={aiSettings.analysisDepth}>
-                <SelectTrigger className="w-32 bg-cyber-light border-neon-blue/30">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-cyber-light border-neon-blue/30">
-                  <SelectItem value="basic">Basic</SelectItem>
-                  <SelectItem value="detailed">Detailed</SelectItem>
-                  <SelectItem value="expert">Expert</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-xs text-muted-foreground">Level of workout analysis and feedback</p>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-white">Real-time Form Corrections</p>
-                <p className="text-xs text-muted-foreground">Get instant feedback during workouts</p>
-              </div>
-              <Switch defaultChecked={aiSettings.formCorrections} />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-white">Nutrition Advice</p>
-                <p className="text-xs text-muted-foreground">Receive meal and supplement suggestions</p>
-              </div>
-              <Switch defaultChecked={aiSettings.nutritionAdvice} />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-white">Recovery Tracking</p>
-                <p className="text-xs text-muted-foreground">Monitor sleep and stress for optimization</p>
-              </div>
-              <Switch defaultChecked={aiSettings.recoveryTracking} />
-            </div>
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground mb-2">Summary</p>
+        <p className="text-white text-sm">{workoutPlan?.summary ?? "No generated plan yet."}</p>
       </Card>
 
       {/* Device Integrations */}
@@ -186,129 +311,42 @@ const Settings = () => {
           <Watch className="h-6 w-6 text-neon-green" />
           <h3 className="text-lg font-bold text-white">Device Integrations</h3>
         </div>
-
         <div className="space-y-3">
-          {deviceIntegrations.map((device, idx) => (
-            <div key={idx} className="flex items-center justify-between p-3 bg-cyber-light rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className={`w-3 h-3 rounded-full ${
-                  device.connected 
-                    ? device.status === 'syncing' ? 'bg-neon-blue ai-glow' : 'bg-neon-green'
-                    : 'bg-cyber-light border border-muted-foreground'
-                }`}></div>
-                <div>
-                  <p className="font-medium text-white">{device.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {device.connected ? `Status: ${device.status}` : 'Not connected'}
-                    {device.battery && ` • ${device.battery}% battery`}
-                  </p>
-                </div>
+          {(deviceIntegrations || []).map((d, i) => (
+            <div key={i} className="flex items-center justify-between p-3 bg-cyber-light rounded-lg">
+              <div>
+                <p className="font-medium text-white">{d.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {d.connected ? `Status: ${d.status ?? "connected"}` : "Not connected"}
+                  {d.battery ? ` • ${d.battery}% battery` : ""}
+                </p>
               </div>
-              
-              <Button 
-                variant={device.connected ? "cyber" : "neon"} 
-                size="sm"
-              >
-                {device.connected ? 'Configure' : 'Connect'}
-              </Button>
+              <Button variant={d.connected ? "cyber" : "neon"} size="sm">{d.connected ? "Configure" : "Connect"}</Button>
             </div>
           ))}
         </div>
       </Card>
 
-      {/* Privacy & Data */}
+      {/* Privacy & Notifications */}
       <Card className="cyber-card p-6 mb-6">
         <div className="flex items-center space-x-3 mb-4">
           <Shield className="h-6 w-6 text-neon-pink" />
-          <h3 className="text-lg font-bold text-white">Privacy & Data</h3>
+          <h3 className="text-lg font-bold text-white">Privacy & Notifications</h3>
         </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-white">Data Sharing</p>
-              <p className="text-xs text-muted-foreground">Share anonymized data for research</p>
-            </div>
-            <Switch defaultChecked={privacySettings.dataSharing} />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-white">Usage Analytics</p>
-              <p className="text-xs text-muted-foreground">Help improve the app experience</p>
-            </div>
-            <Switch defaultChecked={privacySettings.analytics} />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-white">Photo Storage</p>
-              <p className="text-xs text-muted-foreground">Store progress photos securely</p>
-            </div>
-            <Switch defaultChecked={privacySettings.photoStorage} />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-white">Voice Recording</p>
-              <p className="text-xs text-muted-foreground">Record voice for AI interaction</p>
-            </div>
-            <Switch defaultChecked={privacySettings.voiceRecording} />
-          </div>
-        </div>
-
-        <div className="mt-6 pt-4 border-t border-cyber-light">
-          <div className="flex space-x-3">
-            <Button variant="ghost_cyber" className="flex-1">
-              <Shield className="mr-2 h-4 w-4" />
-              Privacy Policy
-            </Button>
-            <Button variant="ghost_cyber" className="flex-1">
-              <Download className="mr-2 h-4 w-4" />
-              Export Data
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      {/* Notifications */}
-      <Card className="cyber-card p-6">
-        <div className="flex items-center space-x-3 mb-4">
-          <Bell className="h-6 w-6 text-neon-purple" />
-          <h3 className="text-lg font-bold text-white">Notifications</h3>
-        </div>
-
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-white">Workout Reminders</p>
               <p className="text-xs text-muted-foreground">Daily workout notifications</p>
             </div>
-            <Switch defaultChecked={true} />
+            <Switch checked={!!notifications?.workoutReminders} onCheckedChange={(v) => saveNotifications({ ...(notifications || {}), workoutReminders: !!v })} />
           </div>
-
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-white">Progress Updates</p>
-              <p className="text-xs text-muted-foreground">Weekly progress summaries</p>
+              <p className="text-xs text-muted-foreground">Weekly summaries</p>
             </div>
-            <Switch defaultChecked={true} />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-white">AI Insights</p>
-              <p className="text-xs text-muted-foreground">Performance insights and tips</p>
-            </div>
-            <Switch defaultChecked={true} />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-white">Recovery Alerts</p>
-              <p className="text-xs text-muted-foreground">Rest day recommendations</p>
-            </div>
-            <Switch defaultChecked={false} />
+            <Switch checked={!!notifications?.progressUpdates} onCheckedChange={(v) => saveNotifications({ ...(notifications || {}), progressUpdates: !!v })} />
           </div>
         </div>
       </Card>

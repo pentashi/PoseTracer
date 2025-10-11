@@ -18,54 +18,71 @@ export default function Login() {
   const navigate = useNavigate();
 
   // Handle email/password login
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
 
-      toast.success(`Welcome back, ${user.email}! 🎉`);
-      setTimeout(() => navigate("/dashboard"), 1000);
-    } catch (err: any) {
-      let message = "Login failed";
-      if (err.code === "auth/user-not-found") message = "No account found with this email.";
-      if (err.code === "auth/wrong-password") message = "Incorrect password.";
-      if (err.code === "auth/invalid-email") message = "Invalid email format.";
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // ✅ Check onboarding status
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    const onboardingComplete = userDoc.data()?.onboardingComplete;
+
+    toast.success(`Welcome back, ${user.email}! 🎉`);
+
+    setTimeout(() => {
+      if (onboardingComplete) {
+        navigate("/dashboard"); // already onboarded
+      } else {
+        navigate("/onboarding"); // first time, complete onboarding
+      }
+    }, 1000);
+  } catch (err: any) {
+    let message = "Login failed";
+    if (err.code === "auth/user-not-found") message = "No account found with this email.";
+    if (err.code === "auth/wrong-password") message = "Incorrect password.";
+    if (err.code === "auth/invalid-email") message = "Invalid email format.";
+    toast.error(message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Handle Google login
   const handleGoogleLogin = async () => {
-    const provider = new GoogleAuthProvider();
-    setLoading(true);
+  const provider = new GoogleAuthProvider();
+  setLoading(true);
 
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
 
-      // Check if Firestore doc exists
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (!userDoc.exists()) {
-        await setDoc(doc(db, "users", user.uid), {
-          email: user.email,
-          createdAt: Date.now(),
-          onboardingComplete: false,
-        });
-      }
-
-      toast.success(`Welcome, ${user.displayName || user.email}! 🚀`);
-      setTimeout(() => navigate("/onboarding"), 1000);
-    } catch (err: any) {
-      toast.error(err.message || "Google login failed ❌");
-    } finally {
-      setLoading(false);
+    // Check if Firestore doc exists
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+    if (!userDoc.exists()) {
+      // First-time user
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        createdAt: Date.now(),
+        onboardingComplete: false,
+      });
+      navigate("/onboarding"); // new user
+    } else {
+      // Existing user
+      const onboardingComplete = userDoc.data()?.onboardingComplete;
+      navigate(onboardingComplete ? "/dashboard" : "/onboarding");
     }
-  };
+
+    toast.success(`Welcome, ${user.displayName || user.email}! 🚀`);
+  } catch (err: any) {
+    toast.error(err.message || "Google login failed ❌");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-cyber-darker to-background p-4">
