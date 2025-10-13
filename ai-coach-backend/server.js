@@ -5,13 +5,14 @@ import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import admin from 'firebase-admin';
 import { buildWorkoutPrompt } from './utils/promptBuilder.js';
-import serviceAccount from './serviceAccountKey.json' assert { type: 'json' };
 
 dotenv.config();
 
 // --------------------
 // 🔥 Initialize Firebase Admin (JSON-based)
 // --------------------
+const serviceAccount = require('./serviceAccountKey.json');
+
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
