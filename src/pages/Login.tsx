@@ -23,22 +23,33 @@ const handleLogin = async (e: React.FormEvent) => {
   setLoading(true);
 
   try {
+    // Try authenticating with Firebase Auth
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    // ✅ Check onboarding status
-    const userDoc = await getDoc(doc(db, "users", user.uid));
+    // 🔍 Check if Firestore user doc exists
+    const userRef = doc(db, "users", user.uid);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+      // 🚫 User authenticated but not in Firestore → treat as invalid
+      await auth.signOut();
+      toast.error("Account not found in our system. Please sign up first.");
+      return;
+    }
+
     const onboardingComplete = userDoc.data()?.onboardingComplete;
 
     toast.success(`Welcome back, ${user.email}! 🎉`);
 
     setTimeout(() => {
       if (onboardingComplete) {
-        navigate("/dashboard"); // already onboarded
+        navigate("/dashboard");
       } else {
-        navigate("/onboarding"); // first time, complete onboarding
+        navigate("/onboarding");
       }
     }, 1000);
+
   } catch (err: any) {
     let message = "Login failed";
     if (err.code === "auth/user-not-found") message = "No account found with this email.";
@@ -49,8 +60,6 @@ const handleLogin = async (e: React.FormEvent) => {
     setLoading(false);
   }
 };
-
-
   // Handle Google login
   const handleGoogleLogin = async () => {
   const provider = new GoogleAuthProvider();

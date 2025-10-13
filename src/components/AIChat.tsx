@@ -1,4 +1,3 @@
-// AIChat.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { collection, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebaseConfig';
@@ -18,10 +17,25 @@ const quickPrompts = [
   { text: "Set new goal", icon: Target }
 ];
 
+const initialWelcomeMessages = [
+  {
+    type: 'ai',
+    message: '👋 Hi there! I’m ACHAPI your AI Fitness Coach. Start by asking me anything or try a quick action below!',
+    timestamp: Date.now(),
+    insights: [],
+  },
+  {
+    type: 'ai',
+    message: '💡 Tip: Use "Analyze my form" after your next exercise for instant feedback.',
+    timestamp: Date.now() + 1,
+    insights: [],
+  }
+];
+
 const AIChat = () => {
   const { user, loading } = useAuth();
   const [inputMessage, setInputMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [chatHistory, setChatHistory] = useState<any[]>(initialWelcomeMessages);
   const [aiTyping, setAiTyping] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -34,12 +48,14 @@ const AIChat = () => {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const messages = snapshot.docs.map(doc => doc.data());
-      setChatHistory(messages);
+      if (messages.length > 0) {
+        setChatHistory(messages);
+      }
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     });
 
     return () => unsubscribe();
-  }, [user?.uid]); // Only subscribe once per user
+  }, [user?.uid]);
 
   // Send message handler
   const handleSendMessage = async () => {
@@ -75,7 +91,7 @@ const AIChat = () => {
       const data = await res.json();
       const aiReply = data.reply || 'No response from AI';
 
-      // Save AI reply (Firestore handles UI)
+      // Save AI reply
       await addDoc(chatRef, {
         type: 'ai',
         message: aiReply,
