@@ -4,14 +4,34 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import admin from 'firebase-admin';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { buildWorkoutPrompt } from './utils/promptBuilder.js';
-import serviceAccount from './serviceAccountKey.json' assert { type: 'json' };
 
+// --------------------
+// 🌍 Setup Environment
+// --------------------
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // --------------------
-// 🔥 Initialize Firebase Admin
+// 🔥 Firebase Admin Setup
 // --------------------
+let serviceAccount;
+
+try {
+  // ✅ Works both locally and on Render
+  const keyPath = path.join(__dirname, 'serviceAccountKey.json');
+  const rawData = fs.readFileSync(keyPath, 'utf8');
+  serviceAccount = JSON.parse(rawData);
+} catch (err) {
+  console.error('❌ Failed to load serviceAccountKey.json:', err.message);
+  process.exit(1);
+}
+
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -24,6 +44,7 @@ const db = admin.firestore();
 // ⚙️ Express Setup
 // --------------------
 const app = express();
+
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -32,7 +53,7 @@ app.use(cors({
 app.use(express.json());
 
 app.use((req, res, next) => {
-  console.log(`Incoming ${req.method} request to ${req.url}`);
+  console.log(`📡 ${req.method} ${req.url}`);
   next();
 });
 
@@ -63,7 +84,7 @@ async function getUserProfile(userId) {
 }
 
 app.post('/chat', async (req, res) => {
-  console.log('🛰️ /chat hit:', new Date().toISOString());
+  console.log('🛰️ /chat called at', new Date().toISOString());
   const { message, userId } = req.body;
 
   if (!message || !userId)
@@ -76,10 +97,10 @@ app.post('/chat', async (req, res) => {
     const messages = [
       {
         role: 'system',
-        content: `You're ACHAPI, an elite hybrid strength & aesthetics fitness coach.
-Use this user profile to personalize your advice:
+        content: `You're ACHAPI, an elite hybrid strength & aesthetics coach. 
+Use this user profile to tailor responses:
 ${JSON.stringify(profile, null, 2)}
-Always remember chat history and speak confidently.`,
+Remember chat history and respond naturally.`,
       },
       ...history.map(h => ({
         role: h.type === 'ai' ? 'assistant' : 'user',
@@ -105,7 +126,7 @@ Always remember chat history and speak confidently.`,
     });
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || 'No response from AI';
+    const reply = data.choices?.[0]?.message?.content || 'No response from AI.';
 
     await db.collection('users').doc(userId).collection('chatHistory').add({
       type: 'ai',
@@ -121,7 +142,7 @@ Always remember chat history and speak confidently.`,
 });
 
 // --------------------
-// 🏋️ Workout Endpoint
+// 🏋️ Workout Generation Endpoint
 // --------------------
 app.post('/generate-workout', async (req, res) => {
   const { profile } = req.body;
@@ -129,12 +150,14 @@ app.post('/generate-workout', async (req, res) => {
 
   try {
     const prompt = buildWorkoutPrompt(profile);
+
     const payload = {
       model: 'llama-3.3-70b-versatile',
       messages: [
         {
           role: 'system',
-          content: "You're ACHAPI, an elite hybrid strength & aesthetics fitness coach. Give personalized workout + nutrition plans.",
+          content:
+            "You're ACHAPI, an elite hybrid strength & aesthetics fitness coach. Generate highly personalized workout + nutrition plans.",
         },
         { role: 'user', content: prompt },
       ],
@@ -173,5 +196,5 @@ app.post('/generate-workout', async (req, res) => {
 // --------------------
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Groq AI Coach running at http://0.0.0.0:${PORT}`);
+  console.log(`🚀 AI Coach backend running at http://0.0.0.0:${PORT}`);
 });
