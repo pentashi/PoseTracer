@@ -64,8 +64,7 @@
     "vaul": "^0.9.9",
     "zod": "^3.25.76",
     "@mediapipe/pose": "0.5.1675469404",
-  "@mediapipe/camera_utils": "0.5.1675469404"
-
+    "@mediapipe/camera_utils": "0.5.1675469404"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
