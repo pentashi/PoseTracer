@@ -10,7 +10,7 @@ import serviceAccount from './serviceAccountKey.json' assert { type: 'json' };
 dotenv.config();
 
 // --------------------
-// 🔥 Initialize Firebase Admin (JSON-based)
+// 🔥 Initialize Firebase Admin
 // --------------------
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -31,9 +31,8 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Log requests
 app.use((req, res, next) => {
-  console.log(`Incoming ${req.method} request to ${req.url} from ${req.ip}`);
+  console.log(`Incoming ${req.method} request to ${req.url}`);
   next();
 });
 
@@ -64,13 +63,11 @@ async function getUserProfile(userId) {
 }
 
 app.post('/chat', async (req, res) => {
-  console.log('🛰️ Received /chat request:', new Date().toISOString());
+  console.log('🛰️ /chat hit:', new Date().toISOString());
   const { message, userId } = req.body;
 
-  if (!message || typeof message !== 'string')
-    return res.status(400).json({ error: 'Invalid message.' });
-  if (!userId || typeof userId !== 'string')
-    return res.status(400).json({ error: 'userId is required.' });
+  if (!message || !userId)
+    return res.status(400).json({ error: 'Missing message or userId' });
 
   try {
     const history = await getChatHistory(userId);
@@ -82,7 +79,7 @@ app.post('/chat', async (req, res) => {
         content: `You're ACHAPI, an elite hybrid strength & aesthetics fitness coach.
 Use this user profile to personalize your advice:
 ${JSON.stringify(profile, null, 2)}
-Always remember the chat history and speak naturally, confidently, and motivationally.`,
+Always remember chat history and speak confidently.`,
       },
       ...history.map(h => ({
         role: h.type === 'ai' ? 'assistant' : 'user',
@@ -108,31 +105,17 @@ Always remember the chat history and speak naturally, confidently, and motivatio
     });
 
     const data = await response.json();
-
-    if (!response.ok) {
-      console.error('❌ Groq API error:', data);
-      return res.status(500).json({ error: 'Groq API error', details: data });
-    }
-
     const reply = data.choices?.[0]?.message?.content || 'No response from AI';
-    console.log('✅ Groq reply:', reply);
 
-    // Save to Firestore if not duplicate
-    const chatRef = db.collection('users').doc(userId).collection('chatHistory');
-    const lastMessages = await chatRef.orderBy('timestamp', 'desc').limit(1).get();
-    const lastMsg = lastMessages.docs[0]?.data();
-
-    if (!lastMsg || lastMsg.message !== reply) {
-      await chatRef.add({
-        type: 'ai',
-        message: reply,
-        timestamp: Date.now(),
-      });
-    }
+    await db.collection('users').doc(userId).collection('chatHistory').add({
+      type: 'ai',
+      message: reply,
+      timestamp: Date.now(),
+    });
 
     res.json({ reply });
   } catch (err) {
-    console.error('🔥 Server error in /chat:', err);
+    console.error('🔥 /chat error:', err);
     res.status(500).json({ error: 'Internal server error.' });
   }
 });
@@ -151,7 +134,7 @@ app.post('/generate-workout', async (req, res) => {
       messages: [
         {
           role: 'system',
-          content: "You're ACHAPI, an elite hybrid strength & aesthetics fitness coach. Provide powerful, actionable, detailed workout and nutrition advice tailored to the user.",
+          content: "You're ACHAPI, an elite hybrid strength & aesthetics fitness coach. Give personalized workout + nutrition plans.",
         },
         { role: 'user', content: prompt },
       ],
@@ -169,23 +152,18 @@ app.post('/generate-workout', async (req, res) => {
     });
 
     const data = await response.json();
-
-    if (!response.ok) {
-      console.error('❌ Groq API error (workout):', data);
-      return res.status(500).json({ error: 'Groq API error', details: data });
-    }
-
     const reply = data.choices?.[0]?.message?.content || '';
     let workoutPlan;
+
     try {
       workoutPlan = JSON.parse(reply);
     } catch {
-      workoutPlan = { text: reply }; // fallback if AI doesn’t return JSON
+      workoutPlan = { text: reply };
     }
 
     res.json({ workoutPlan });
   } catch (err) {
-    console.error('🔥 Server error (workout):', err);
+    console.error('🔥 /generate-workout error:', err);
     res.status(500).json({ error: 'Internal server error.' });
   }
 });
