@@ -10,25 +10,28 @@ import { fileURLToPath } from 'url';
 import { buildWorkoutPrompt } from './utils/promptBuilder.js';
 
 // --------------------
-// 🌍 Setup Environment
+// 🌍 Environment Setup
 // --------------------
 dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --------------------
-// 🔥 Firebase Admin Setup
+// 🔥 Firebase Setup
 // --------------------
 let serviceAccount;
 
 try {
-  // ✅ Works both locally and on Render
+  // ✅ Handles local + Render deploys
   const keyPath = path.join(__dirname, 'serviceAccountKey.json');
+  if (!fs.existsSync(keyPath)) {
+    throw new Error('serviceAccountKey.json not found.');
+  }
+
   const rawData = fs.readFileSync(keyPath, 'utf8');
   serviceAccount = JSON.parse(rawData);
 } catch (err) {
-  console.error('❌ Failed to load serviceAccountKey.json:', err.message);
+  console.error('❌ Could not load Firebase service account:', err.message);
   process.exit(1);
 }
 
@@ -44,15 +47,10 @@ const db = admin.firestore();
 // ⚙️ Express Setup
 // --------------------
 const app = express();
-
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization'] }));
 app.use(express.json());
 
-app.use((req, res, next) => {
+app.use((req, _, next) => {
   console.log(`📡 ${req.method} ${req.url}`);
   next();
 });
@@ -64,7 +62,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 if (!GROQ_API_KEY) {
-  console.error('❌ GROQ_API_KEY missing from environment.');
+  console.error('❌ Missing GROQ_API_KEY in .env');
   process.exit(1);
 }
 
@@ -84,11 +82,12 @@ async function getUserProfile(userId) {
 }
 
 app.post('/chat', async (req, res) => {
-  console.log('🛰️ /chat called at', new Date().toISOString());
+  console.log('🛰️ /chat invoked at', new Date().toISOString());
   const { message, userId } = req.body;
 
-  if (!message || !userId)
+  if (!message || !userId) {
     return res.status(400).json({ error: 'Missing message or userId' });
+  }
 
   try {
     const history = await getChatHistory(userId);
@@ -97,10 +96,10 @@ app.post('/chat', async (req, res) => {
     const messages = [
       {
         role: 'system',
-        content: `You're ACHAPI, an elite hybrid strength & aesthetics coach. 
-Use this user profile to tailor responses:
+        content: `You're ACHAPI — an elite hybrid strength & aesthetics coach.
+Use this user profile for context:
 ${JSON.stringify(profile, null, 2)}
-Remember chat history and respond naturally.`,
+Always maintain memory and confidence.`,
       },
       ...history.map(h => ({
         role: h.type === 'ai' ? 'assistant' : 'user',
@@ -142,11 +141,11 @@ Remember chat history and respond naturally.`,
 });
 
 // --------------------
-// 🏋️ Workout Generation Endpoint
+// 🏋️ Workout Endpoint
 // --------------------
 app.post('/generate-workout', async (req, res) => {
   const { profile } = req.body;
-  if (!profile) return res.status(400).json({ error: 'Profile is required' });
+  if (!profile) return res.status(400).json({ error: 'Profile is required.' });
 
   try {
     const prompt = buildWorkoutPrompt(profile);
@@ -156,8 +155,7 @@ app.post('/generate-workout', async (req, res) => {
       messages: [
         {
           role: 'system',
-          content:
-            "You're ACHAPI, an elite hybrid strength & aesthetics fitness coach. Generate highly personalized workout + nutrition plans.",
+          content: "You're ACHAPI, an elite hybrid coach. Create a deeply personalized workout and nutrition plan.",
         },
         { role: 'user', content: prompt },
       ],
@@ -176,8 +174,8 @@ app.post('/generate-workout', async (req, res) => {
 
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content || '';
-    let workoutPlan;
 
+    let workoutPlan;
     try {
       workoutPlan = JSON.parse(reply);
     } catch {
