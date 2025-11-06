@@ -171,12 +171,15 @@ const nextStep = async () => {
 
     if (!res.ok) throw new Error(data.error || 'Workout generation failed');
 
-    // Save workout plan
-    await setDoc(doc(db, 'users', user.uid), { workoutPlan: data.workoutPlan }, { merge: true });
-    await new Promise(res => setTimeout(res, 200));
+  // Save workout plan
+await setDoc(doc(db, 'users', user.uid), { workoutPlan: data.workoutPlan }, { merge: true });
+// ✅ Ensure onboardingComplete is saved
+await setDoc(doc(db, 'users', user.uid), { onboardingComplete: true }, { merge: true });
 
-    toast.success('Workout plan generated successfully! 💪', { id: toastId });
-setGeneratedWorkout(data.workoutPlan); // show the generated workout view
+toast.success('Workout plan generated successfully! 💪', { id: toastId });
+
+// ✅ Show workout preview instead of navigating
+setGeneratedWorkout(data.workoutPlan);
 
   } catch (err: any) {
     console.error(err);
@@ -530,7 +533,7 @@ setGeneratedWorkout(data.workoutPlan); // show the generated workout view
     {generatedWorkout && !showDashboard && (
       <GeneratedWorkoutView
         workout={generatedWorkout}
-        onGoToDashboard={() => setShowDashboard(true)}
+        onGoToDashboard={() => navigate("/dashboard", { replace: true })}
       />
     )}
 
