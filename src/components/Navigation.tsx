@@ -18,31 +18,32 @@ const Navigation: React.FC = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-cyber-dark border-t border-neon-purple/30 p-4">
-      <div className="flex items-center justify-between max-w-md mx-auto">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = location.pathname === item.path;
+<div className="flex items-center justify-around w-full">
+  {navItems.map((item) => {
+    const Icon = item.icon;
+    const isActive = location.pathname === item.path;
 
-          return (
-            <Button
-              key={item.id}
-              variant={isActive ? "neon" : "ghost_cyber"}
-              size="sm"
-              className={`flex flex-col items-center space-y-1 h-auto py-2 px-3 ${
-                isActive ? 'ai-glow' : ''
-              }`}
-              onClick={() => navigate(item.path)}
-            >
-              <Icon className={`h-4 w-4 ${isActive ? 'text-cyber-dark' : 'text-neon-purple'}`} />
-              <span className={`text-xs ${
-                isActive ? 'text-cyber-dark font-semibold' : 'text-muted-foreground'
-              }`}>
-                {item.label}
-              </span>
-            </Button>
-          );
-        })}
-      </div>
+    return (
+      <Button
+        key={item.id}
+        variant={isActive ? "neon" : "ghost_cyber"}
+        size="sm"
+        className={`flex flex-col items-center space-y-1 h-auto py-2 px-2 ${
+          isActive ? 'ai-glow' : ''
+        }`}
+        onClick={() => navigate(item.path)}
+      >
+        <Icon className={`h-4 w-4 ${isActive ? 'text-cyber-dark' : 'text-neon-purple'}`} />
+        <span className={`text-xs ${
+          isActive ? 'text-cyber-dark font-semibold' : 'text-muted-foreground'
+        }`}>
+          {item.label}
+        </span>
+      </Button>
+    );
+  })}
+</div>
+
     </nav>
   );
 };
