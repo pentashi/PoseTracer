@@ -72,13 +72,15 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-            {/* Last Updated */}
-      <div className="text-right text-xs text-gray-400 mb-4">
-        <span>
-          Last updated: {new Date().toLocaleString()}
-        </span>
+              {/* Last Updated */}
+      <div className="text-right text-xs text-gray-400 mb-1">
+        <span>Last updated: {new Date().toLocaleString()}</span>
       </div>
 
+      {/* Daily Motivation */}
+      <div className="text-sm text-neon-blue mb-6">
+        “Small progress every day leads to big results.”
+      </div>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-4 mb-6">
