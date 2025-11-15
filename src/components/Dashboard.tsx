@@ -72,6 +72,13 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+            {/* Last Updated */}
+      <div className="text-right text-xs text-gray-400 mb-4">
+        <span>
+          Last updated: {new Date().toLocaleString()}
+        </span>
+      </div>
+
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-4 mb-6">
