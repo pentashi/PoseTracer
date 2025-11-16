@@ -6,13 +6,12 @@ import heroFitness from "@/assets/hero-fitness.jpg";
 import Navigation from "./Navigation";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { getUserSettings } from "@/services/userService"; // your Firestore fetch function
+import { getUserSettings } from "@/services/userService";
 import { auth } from "@/firebaseConfig";
 
 const Dashboard = () => {
   const navigate = useNavigate();
 
-  // Fetch user settings from Firestore
   const { data: userSettings, isLoading } = useQuery({
     queryKey: ["userSettings"],
     queryFn: getUserSettings,
@@ -21,35 +20,16 @@ const Dashboard = () => {
 
   const userName = userSettings?.name ?? "User";
 
-  // Dummy workout & messages data (replace with live data if needed)
-  const workoutData = {
-    todaysWorkout: {
-      name: "Upper Body Power",
-      exercises: 8,
-      completed: 5,
-      timeElapsed: "32 min",
-      estimatedTime: "45 min",
-    },
-    goals: {
-      primaryGoal: "Build Muscle Mass",
-      progress: 68,
-      milestone: "Bench Press 225lbs",
-      nextMilestone: "Deadlift 315lbs",
-    },
-  };
-
   const recentMessages = [
     {
       type: "ai",
-      message:
-        "Great form on those squats! Try to go 2 inches deeper on your next set.",
+      message: "Great form on those squats! Try to go 2 inches deeper on your next set.",
       time: "2 min ago",
     },
     { type: "user", message: "Should I increase weight on bench press?", time: "5 min ago" },
     {
       type: "ai",
-      message:
-        "Based on your last 3 sessions, you're ready for +10lbs. Your strength curve shows optimal progression.",
+      message: "Based on your last 3 sessions, you're ready for +10lbs. Your strength curve shows optimal progression.",
       time: "5 min ago",
     },
   ];
@@ -59,7 +39,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-cyber-darker to-background p-4">
+    <div className="bg-gradient-to-b from-cyber-darker to-background p-4">
       {/* Hero Section */}
       <div className="relative mb-8 rounded-xl overflow-hidden">
         <img src={heroFitness} alt="AI Fitness Dashboard" className="w-full h-48 object-cover" />
@@ -72,7 +52,8 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-              {/* Last Updated */}
+
+      {/* Last Updated */}
       <div className="text-right text-xs text-gray-400 mb-1">
         <span>Last updated: {new Date().toLocaleString()}</span>
       </div>
@@ -136,10 +117,8 @@ const Dashboard = () => {
         </Button>
       </Card>
 
-      {/* Navigation at bottom */}
-      <div className="min-h-screen bg-gradient-to-b from-cyber-darker to-background p-4 pb-24">
-        <Navigation currentView="dashboard" onViewChange={(view) => console.log("Navigate to", view)} />
-      </div>
+      {/* Navigation */}
+      <Navigation currentView="dashboard" onViewChange={(view) => console.log("Navigate to", view)} />
     </div>
   );
 };
