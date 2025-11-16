@@ -23,3 +23,4 @@ dist-ssr
 *.sln
 *.sw?
 *.env
+ai-coach-backend/serviceAccountKey.json
