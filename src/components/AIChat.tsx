@@ -1,14 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  collection, addDoc, query, orderBy, onSnapshot, getDocs, writeBatch, doc 
-} from 'firebase/firestore';
-import { db } from '@/firebaseConfig';
-import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Send, Mic, Camera, BarChart3, Zap, Heart, Target, Trash2, ChevronDown } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import aiCoachAvatar from '@/assets/ai-coach-avatar.png';
 
 const quickPrompts = [
@@ -17,22 +13,6 @@ const quickPrompts = [
   { text: "Modify workout", icon: Zap },
   { text: "Nutrition advice", icon: Heart },
   { text: "Set new goal", icon: Target }
-];
-
-// Welcome messages marked as AI messages
-const initialWelcomeMessages = [
-  {
-    type: 'ai',
-    message: '👋 Hi there! I’m ACHAPI your AI Fitness Coach. Start by asking me anything or try a quick action below!',
-    timestamp: Date.now(),
-    insights: [],
-  },
-  {
-    type: 'ai',
-    message: '💡 Tip: Use "Analyze my form" after your next exercise for instant feedback.',
-    timestamp: Date.now() + 1,
-    insights: [],
-  }
 ];
 
 const AIChat: React.FC = () => {
@@ -44,33 +24,22 @@ const AIChat: React.FC = () => {
   const chatRefDiv = useRef<HTMLDivElement>(null);
 
   // -------------------
-  // Initialize chat & listen for updates
+  // Fetch chat history from backend
   // -------------------
   useEffect(() => {
     if (!user) return;
-    const chatRef = collection(db, 'users', user.uid, 'chatHistory');
 
-    // initialize welcome messages once
-    const initMessages = async () => {
-      const snapshot = await getDocs(chatRef);
-      if (snapshot.empty) {
-        const batch = writeBatch(db);
-        initialWelcomeMessages.forEach(msg => batch.set(doc(chatRef), msg));
-        await batch.commit();
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch(`http://localhost:4000/chat-history?userId=${user.uid}`);
+        const data = await res.json();
+        setChatHistory(data.history || []);
+      } catch (err) {
+        console.error('Error fetching chat history:', err);
       }
     };
-    initMessages();
 
-    // Listen to chat updates
-    const q = query(chatRef, orderBy('timestamp', 'asc'));
-    const unsubscribe = onSnapshot(q, snapshot => {
-      const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // deduplicate by ID
-      const uniqueMessages = messages.filter((v,i,a) => a.findIndex(x => x.id === v.id) === i);
-      setChatHistory(uniqueMessages);
-    });
-
-    return () => unsubscribe();
+    fetchHistory();
   }, [user?.uid]);
 
   // -------------------
@@ -93,71 +62,61 @@ const AIChat: React.FC = () => {
     chatRefDiv.current?.scrollTo({ top: chatRefDiv.current.scrollHeight, behavior: 'smooth' });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [chatHistory, aiTyping]);
+  useEffect(() => { scrollToBottom(); }, [chatHistory, aiTyping]);
 
   // -------------------
-  // Send user message
+  // Send message to backend
   // -------------------
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !user || aiTyping) return; 
-  setAiTyping(true);
+    if (!inputMessage.trim() || !user || aiTyping) return;
+    setAiTyping(true);
 
-  const chatRef = collection(db, 'users', user.uid, 'chatHistory');
-  const messageToSend = inputMessage;
-  setInputMessage('');
+    const messageToSend = inputMessage;
+    setInputMessage('');
 
-  try {
-    // Save user message
-    await addDoc(chatRef, { type: 'user', message: messageToSend, timestamp: Date.now(), insights: [] });
+    try {
+      const res = await fetch('http://localhost:4000/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: messageToSend, userId: user.uid })
+      });
 
-    // Fetch AI reply
-    const res = await fetch('http://localhost:4000/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: messageToSend, userId: user.uid })
-    });
+      if (!res.ok) {
+        console.error(await res.text());
+        setAiTyping(false);
+        return;
+      }
 
-    if (!res.ok) { console.error(await res.text()); setAiTyping(false); return; }
+      const data = await res.json();
+      const aiReply = data.reply || 'No response from AI';
 
-    const data = await res.json();
-    const aiReply = data.reply || 'No response from AI';
+      // Append user + AI messages locally
+      setChatHistory(prev => [
+        ...prev,
+        { type: 'user', message: messageToSend, timestamp: Date.now() },
+        { type: 'ai', message: aiReply, timestamp: Date.now() }
+      ]);
 
-    // Fetch latest message to check for duplication
-    const latestSnapshot = await query(collection(db, 'users', user.uid, 'chatHistory'), orderBy('timestamp', 'desc'));
-    const latestDocs = await getDocs(latestSnapshot);
-    const latestMsg = latestDocs.docs[0]?.data();
-
-    if (latestMsg?.type !== 'ai' || latestMsg?.message !== aiReply) {
-      await addDoc(chatRef, { type: 'ai', message: aiReply, timestamp: Date.now(), insights: [] });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAiTyping(false);
     }
-
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setAiTyping(false);
-  }
-};
-
+  };
 
   // -------------------
-  // Clear chat
+  // Clear chat via backend
   // -------------------
   const handleClearChat = async () => {
     if (!user) return;
     if (!confirm('Are you sure you want to clear the chat?')) return;
 
-    const chatRef = collection(db, 'users', user.uid, 'chatHistory');
-    const snapshot = await getDocs(chatRef);
-    const batch = writeBatch(db);
-    snapshot.docs.forEach(docSnap => batch.delete(docSnap.ref));
-    await batch.commit();
-
-    // Reset with welcome messages
-    const batch2 = writeBatch(db);
-    initialWelcomeMessages.forEach(msg => batch2.set(doc(chatRef), msg));
-    await batch2.commit();
+    try {
+      await fetch(`http://localhost:4000/clear-chat?userId=${user.uid}`, { method: 'POST' });
+      setChatHistory([]); // reset locally
+    } catch (err) {
+      console.error('Error clearing chat:', err);
+    }
   };
 
   if (loading) return <p>Loading...</p>;
@@ -181,8 +140,8 @@ const AIChat: React.FC = () => {
 
       {/* Chat Messages */}
       <div className="flex-1 mb-6 overflow-y-auto max-h-[60vh] relative" ref={chatRefDiv}>
-        {chatHistory.map((msg) => (
-          <Card key={msg.id} className={`p-4 animate-fadeIn mb-4 ${msg.type==='ai'?'cyber-card ml-0 mr-12':'bg-neon-purple/20 border-neon-purple ml-12 mr-0'}`}>
+        {chatHistory.map((msg, idx) => (
+          <Card key={idx} className={`p-4 animate-fadeIn mb-4 ${msg.type==='ai'?'cyber-card ml-0 mr-12':'bg-neon-purple/20 border-neon-purple ml-12 mr-0'}`}>
             <div className="flex items-start space-x-3">
               {msg.type==='ai' && <img src={aiCoachAvatar} alt="AI" className="w-8 h-8 rounded-full"/>}
               <div className="flex-1">

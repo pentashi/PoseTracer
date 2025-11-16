@@ -22,11 +22,8 @@ const __dirname = path.dirname(__filename);
 let serviceAccount;
 
 try {
-  // ✅ Handles local + Render deploys
   const keyPath = path.join(__dirname, 'serviceAccountKey.json');
-  if (!fs.existsSync(keyPath)) {
-    throw new Error('serviceAccountKey.json not found.');
-  }
+  if (!fs.existsSync(keyPath)) throw new Error('serviceAccountKey.json not found.');
 
   const rawData = fs.readFileSync(keyPath, 'utf8');
   serviceAccount = JSON.parse(rawData);
@@ -67,12 +64,12 @@ if (!GROQ_API_KEY) {
 }
 
 // --------------------
-// 💬 Chat Endpoint
+// 🔹 Helper Functions
 // --------------------
 async function getChatHistory(userId) {
   const chatRef = db.collection('users').doc(userId).collection('chatHistory');
   const snapshot = await chatRef.orderBy('timestamp', 'asc').get();
-  return snapshot.docs.map(doc => doc.data());
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 }
 
 async function getUserProfile(userId) {
@@ -81,13 +78,12 @@ async function getUserProfile(userId) {
   return userSnap.exists ? userSnap.data() : {};
 }
 
+// --------------------
+// 💬 Chat Endpoint
+// --------------------
 app.post('/chat', async (req, res) => {
-  console.log('🛰️ /chat invoked at', new Date().toISOString());
   const { message, userId } = req.body;
-
-  if (!message || !userId) {
-    return res.status(400).json({ error: 'Missing message or userId' });
-  }
+  if (!message || !userId) return res.status(400).json({ error: 'Missing message or userId' });
 
   try {
     const history = await getChatHistory(userId);
@@ -108,25 +104,17 @@ Always maintain memory and confidence.`,
       { role: 'user', content: message },
     ];
 
-    const payload = {
-      model: 'llama-3.3-70b-versatile',
-      messages,
-      temperature: 0.9,
-      max_tokens: 1000,
-    };
-
+    const payload = { model: 'llama-3.3-70b-versatile', messages, temperature: 0.9, max_tokens: 1000 };
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content || 'No response from AI.';
 
+    // Save AI reply
     await db.collection('users').doc(userId).collection('chatHistory').add({
       type: 'ai',
       message: reply,
@@ -149,14 +137,10 @@ app.post('/generate-workout', async (req, res) => {
 
   try {
     const prompt = buildWorkoutPrompt(profile);
-
     const payload = {
       model: 'llama-3.3-70b-versatile',
       messages: [
-        {
-          role: 'system',
-          content: "You're ACHAPI, an elite hybrid coach. Create a deeply personalized workout and nutrition plan.",
-        },
+        { role: 'system', content: "You're ACHAPI, an elite hybrid coach. Create a deeply personalized workout and nutrition plan." },
         { role: 'user', content: prompt },
       ],
       temperature: 0.7,
@@ -165,26 +149,58 @@ app.post('/generate-workout', async (req, res) => {
 
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content || '';
-
     let workoutPlan;
-    try {
-      workoutPlan = JSON.parse(reply);
-    } catch {
-      workoutPlan = { text: reply };
-    }
+    try { workoutPlan = JSON.parse(data.choices?.[0]?.message?.content || '{}'); } 
+    catch { workoutPlan = { text: data.choices?.[0]?.message?.content || '' }; }
 
     res.json({ workoutPlan });
   } catch (err) {
     console.error('🔥 /generate-workout error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+// --------------------
+// 📜 Chat History Endpoint
+// --------------------
+app.get('/chat-history', async (req, res) => {
+  const userId = req.query.userId;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+  try {
+    const chatRef = db.collection('users').doc(userId).collection('chatHistory');
+    const snapshot = await chatRef.orderBy('timestamp', 'asc').get();
+    const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json({ history });
+  } catch (err) {
+    console.error('🔥 /chat-history Firestore error:', err);
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
+
+// --------------------
+// 🧹 Clear Chat Endpoint
+// --------------------
+app.post('/clear-chat', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+  try {
+    const chatRef = db.collection('users').doc(userId).collection('chatHistory');
+    const snapshot = await chatRef.get();
+
+    const batch = db.batch();
+    snapshot.docs.forEach(docSnap => batch.delete(docSnap.ref));
+    await batch.commit();
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('🔥 /clear-chat error:', err);
     res.status(500).json({ error: 'Internal server error.' });
   }
 });
