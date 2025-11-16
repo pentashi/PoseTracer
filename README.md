@@ -1,73 +1,157 @@
-# Welcome to your Lovable project
+PoseTracer — The AI Fitness Training OS
 
-## Project info
+PoseTracer is a next-generation, AI-powered fitness platform designed to deliver hyper-personalized training plans, real-time workout tracking, and intelligent progression — all wrapped in a clean, cyber-modern experience.
 
-**URL**: https://lovable.dev/projects/385d226e-1880-41e4-aacb-ec4565b9a247
+Built for performance. Engineered for scale. Designed to impress.
 
-## How can I edit this code?
+🚀 Product Overview
 
-There are several ways of editing your application.
+PoseTracer uses advanced AI models to generate individualized workout plans based on the user’s goals, experience, injuries, equipment access, schedule, and training preferences.
 
-**Use Lovable**
+The platform blends:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/385d226e-1880-41e4-aacb-ec4565b9a247) and start prompting.
+Precision-personalized programming
 
-Changes made via Lovable will be committed automatically to this repo.
+Real-time exercise tracking
 
-**Use your preferred IDE**
+Adaptive progression
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Clean UI
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+High-speed infrastructure
 
-Follow these steps:
+This is not another generic fitness app.
+This is your AI Training OS.
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+🛠 Tech Stack
+
+PoseTracer is built with a modern, high-performance stack:
+
+React + TypeScript
+
+Vite
+
+Tailwind CSS
+
+shadcn/ui
+
+Firebase (Auth, Firestore, Storage)
+
+Groq / LLM-based plan generation
+
+Fast, modular, and fully scalable.
+
+🔧 Development Workflow
+
+You can work on PoseTracer in whichever environment suits your speed.
+
+1. Build inside Lovable
+
+Instant edits. AI-assisted changes. Auto commits.
+
+👉 https://lovable.dev/projects/385d226e-1880-41e4-aacb-ec4565b9a247
+
+2. Local Development (Recommended for production)
+
+Ensure Node.js and npm are installed.
+(Use nvm for seamless version management: https://github.com/nvm-sh/nvm#installing-and-updating
+)
+
+# Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
+# Navigate to the project
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the development server
 npm run dev
-```
 
-**Edit a file directly in GitHub**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+Hot reload. Instant preview. Zero friction.
 
-**Use GitHub Codespaces**
+3. Quick Edits on GitHub
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Navigate to the file
 
-## What technologies are used for this project?
+Click the Edit (✎) icon
 
-This project is built with:
+Commit your changes
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Straightforward for fast patches.
 
-## How can I deploy this project?
+4. GitHub Codespaces
 
-Simply open [Lovable](https://lovable.dev/projects/385d226e-1880-41e4-aacb-ec4565b9a247) and click on Share -> Publish.
+Cloud dev environment with zero setup.
 
-## Can I connect a custom domain to my Lovable project?
+Go to the repo home
 
-Yes, you can!
+Click Code → Codespaces
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Create a new environment
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Start editing and commit normally
+
+Perfect for editing on the go.
+
+🌐 Deployment
+
+Deployment is handled seamlessly through Lovable Hosting.
+
+Open the Lovable project
+
+Click Share → Publish
+
+Instant production deployment.
+
+Custom Domain Support
+
+You can connect your own domain directly:
+
+Project → Settings → Domains → Connect Domain
+
+Full guide:
+https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide
+
+🔥 Core Features (Already Working)
+
+✔ AI-powered personalized workout plan generation
+✔ Full weekly training breakdown
+✔ Day-by-day routines
+✔ Dynamic Today Workout screen
+✔ Set/rep tracking
+✔ Exercise progression
+✔ Firestore-backed user profiles
+✔ Clean cyber-fitness UI
+
+PoseTracer is not an idea — it’s a working product.
+
+🧭 Architecture Principles
+
+Modular utilities
+
+Clean separation of concerns
+
+Scalable plan-generation logic
+
+Strong typing via TypeScript
+
+Responsive, consistent UI design
+
+Real-time data sync with Firebase
+
+Built to grow.
+
+🏆 Vision
+
+To redefine digital fitness by combining AI intelligence, biomechanics awareness, and real-time workout tracking into a single, fluid training ecosystem.
+
+PoseTracer isn’t here to join the fitness app crowd.
+It’s here to replace them.
+
+📩 Contact / Collaboration
+
+For partnerships, collaborations, or enterprise integrations:
+Founder - achapipentashi@gmail.com
