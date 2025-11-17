@@ -81,6 +81,7 @@ async function getUserProfile(userId) {
 // --------------------
 // 💬 Chat Endpoint
 // --------------------
+// 💬 Chat Endpoint (fixed today alignment)
 app.post('/chat', async (req, res) => {
   const { message, userId } = req.body;
   if (!message || !userId) return res.status(400).json({ error: 'Missing message or userId' });
@@ -89,14 +90,28 @@ app.post('/chat', async (req, res) => {
     const history = await getChatHistory(userId);
     const profile = await getUserProfile(userId);
 
-    const messages = [
-      {
-        role: 'system',
-        content: `You're ACHAPI — an elite hybrid strength & aesthetics coach.
+    // Compute todayKey based on user's workoutPlan
+    const weeklySchedule = profile.workoutPlan?.weeklySchedule || {};
+    const dayKeys = Object.keys(weeklySchedule).sort(
+      (a, b) => parseInt(a.replace(/\D/g, ''), 10) - parseInt(b.replace(/\D/g, ''), 10)
+    );
+    const todayIndex = (new Date().getDay() + 6) % 7; // JS Sunday=0 → Monday=0
+    const todayKey = dayKeys[todayIndex];
+
+    // System message includes today info
+    const systemMessage = {
+      role: 'system',
+      content: `You're ACHAPI — an elite hybrid strength & aesthetics coach.
 Use this user profile for context:
 ${JSON.stringify(profile, null, 2)}
-Always maintain memory and confidence.`,
-      },
+
+Today is ${todayKey} (according to user's schedule). 
+Always answer using the correct day and exercises for today. Be confident and specific.`
+    };
+
+    // Build messages for AI
+    const messages = [
+      systemMessage,
       ...history.map(h => ({
         role: h.type === 'ai' ? 'assistant' : 'user',
         content: h.message,
@@ -104,6 +119,7 @@ Always maintain memory and confidence.`,
       { role: 'user', content: message },
     ];
 
+    // Call Groq AI
     const payload = { model: 'llama-3.3-70b-versatile', messages, temperature: 0.9, max_tokens: 1000 };
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
@@ -114,7 +130,7 @@ Always maintain memory and confidence.`,
     const data = await response.json();
     const reply = data.choices?.[0]?.message?.content || 'No response from AI.';
 
-    // Save AI reply
+    // Save AI reply to Firestore
     await db.collection('users').doc(userId).collection('chatHistory').add({
       type: 'ai',
       message: reply,
