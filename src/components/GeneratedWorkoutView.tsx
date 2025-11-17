@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dumbbell, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { getUserSettings } from "@/services/userService"; // This should fetch the user doc including workoutPlan
+import { getUserSettings } from "@/services/userService";
 import { auth } from "@/firebaseConfig";
 import { toast } from "sonner";
 
@@ -13,7 +13,6 @@ interface GeneratedWorkoutViewProps {
 }
 
 const GeneratedWorkoutView: React.FC<GeneratedWorkoutViewProps> = ({ onGoToDashboard }) => {
-  // Fetch user settings (including workoutPlan)
   const { data, isLoading, isError } = useQuery({
     queryKey: ["userSettings"],
     queryFn: getUserSettings,
@@ -28,6 +27,12 @@ const GeneratedWorkoutView: React.FC<GeneratedWorkoutViewProps> = ({ onGoToDashb
 
   if (isLoading) return <p className="text-white text-center mt-12">Loading workout plan...</p>;
   if (isError || !workout) return <p className="text-red-400 text-center mt-12">No workout plan found</p>;
+
+  // Map DAY1-DAY7 to weekdays starting Monday
+  const dayKeys = Object.keys(workout.weeklySchedule)
+    .sort((a, b) => parseInt(a.replace(/\D/g, ""), 10) - parseInt(b.replace(/\D/g, ""), 10));
+  const todayIndex = (new Date().getDay() + 6) % 7;
+  const todayKey = dayKeys[todayIndex];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-cyber-darker to-background p-4 flex flex-col items-center">
@@ -51,44 +56,49 @@ const GeneratedWorkoutView: React.FC<GeneratedWorkoutViewProps> = ({ onGoToDashb
         )}
 
         {/* Weekly Schedule */}
-     {workout.weeklySchedule && (
-  <div className="space-y-4">
-    {Object.entries(workout.weeklySchedule)
-      .sort(([aKey], [bKey]) => {
-        // Extract number from DAY1, DAY2, etc.
-        const aNum = parseInt(aKey.replace(/\D/g, ""), 10);
-        const bNum = parseInt(bKey.replace(/\D/g, ""), 10);
-        return aNum - bNum;
-      })
-      .map(([dayKey, dayData]: any, idx) => (
-        <Card key={idx} className="cyber-card p-5">
-          <h3 className="text-xl font-bold text-neon-blue mb-3">
-            {dayKey.toUpperCase()}: {dayData.focus}
-          </h3>
+        {workout.weeklySchedule && (
+          <div className="space-y-4">
+            {Object.entries(workout.weeklySchedule)
+              .sort(([aKey], [bKey]) => parseInt(aKey.replace(/\D/g, ""), 10) - parseInt(bKey.replace(/\D/g, ""), 10))
+              .map(([dayKey, dayData]: any, idx) => {
+                const isToday = dayKey === todayKey;
 
-          {dayData.exercises && dayData.exercises.length > 0 ? (
-            <ul className="space-y-3 text-white text-sm leading-relaxed">
-              {dayData.exercises.map((ex: any, i: number) => (
-                <li key={i} className="border-b border-cyber-light/20 pb-3">
-                  <p className="font-semibold text-neon-green text-base mb-1">{ex.exercise}</p>
-                  <p className="text-white/90 text-sm mb-1">
-                    Sets x Reps: {ex.sets} x {ex.reps}
-                  </p>
-                  {ex.rest && <p className="text-white/90 text-sm mb-1">Rest: {ex.rest}</p>}
-                  {ex.equipment && <p className="text-white/90 text-sm mb-1">Equipment: {ex.equipment}</p>}
-                  {ex.alternatives && ex.alternatives.length > 0 && (
-                    <p className="text-white/90 text-sm">Alternatives: {ex.alternatives.join(", ")}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-white/70 italic">No exercises. Rest or recovery day.</p>
-          )}
-        </Card>
-      ))}
-  </div>
-)}
+                return (
+                  <div
+                    key={idx}
+                    className={`rounded-lg ${isToday ? "border-2 border-neon-green animate-pulse" : ""}`}
+                  >
+                    <Card className="cyber-card p-5">
+                      <h3 className="text-xl font-bold text-neon-blue mb-3">
+                        {dayKey.toUpperCase()}: {dayData.focus}
+                        {isToday && <span className="ml-2 text-neon-green font-semibold">(Today)</span>}
+                      </h3>
+
+                      {dayData.exercises && dayData.exercises.length > 0 ? (
+                        <ul className="space-y-3 text-white text-sm leading-relaxed">
+                          {dayData.exercises.map((ex: any, i: number) => (
+                            <li key={i} className="border-b border-cyber-light/20 pb-3">
+                              <p className="font-semibold text-neon-green text-base mb-1">{ex.exercise}</p>
+                              <p className="text-white/90 text-sm mb-1">
+                                Sets x Reps: {ex.sets} x {ex.reps}
+                              </p>
+                              {ex.rest && <p className="text-white/90 text-sm mb-1">Rest: {ex.rest}</p>}
+                              {ex.equipment && <p className="text-white/90 text-sm mb-1">Equipment: {ex.equipment}</p>}
+                              {ex.alternatives && ex.alternatives.length > 0 && (
+                                <p className="text-white/90 text-sm">Alternatives: {ex.alternatives.join(", ")}</p>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-white/70 italic">No exercises. Rest or recovery day.</p>
+                      )}
+                    </Card>
+                  </div>
+                );
+              })}
+          </div>
+        )}
 
         {/* Notes & Tips */}
         {workout.notes && (
