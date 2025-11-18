@@ -81,44 +81,42 @@ const WorkoutTracking = () => {
 
   // Timer (optional continuous)
   useEffect(() => {
-    if (isActive) {
-      const interval = setInterval(() => setTimer((t) => t + 1), 1000);
-      return () => clearInterval(interval);
+  const video = document.getElementById("cameraFeed") as HTMLVideoElement;
+  if (!video) return;
+
+  const startCamera = async () => {
+    console.log("Starting camera..."); // ✅ logging
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false,
+      });
+      video.srcObject = stream;
+      console.log("Camera started successfully"); // ✅ logging
+    } catch (err) {
+      console.error("Camera access denied:", err);
+      toast.error("Camera access is required for AI tracking.");
     }
-  }, [isActive,currentExerciseData]);
-  // 🎥 Live camera feed for AI tracking
-  useEffect(() => {
-    const video = document.getElementById("cameraFeed") as HTMLVideoElement;
-    if (!video) return;
+  };
 
-    const startCamera = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
-          audio: false,
-        });
-        video.srcObject = stream;
-      } catch (err) {
-        console.error("Camera access denied:", err);
-        toast.error("Camera access is required for AI tracking.");
-      }
-    };
-
-    if (isActive) startCamera();
-    else {
-      // stop camera if paused
-      const stream = video.srcObject as MediaStream;
-      if (stream) {
-        stream.getTracks().forEach((t) => t.stop());
-        video.srcObject = null;
-      }
+  if (isActive) startCamera();
+  else {
+    console.log("Pausing camera"); // ✅ logging
+    const stream = video.srcObject as MediaStream;
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      video.srcObject = null;
     }
+  }
 
-    return () => {
-      const stream = video?.srcObject as MediaStream;
-      if (stream) stream.getTracks().forEach((t) => t.stop());
-    };
-  }, [isActive]);
+  return () => {
+    console.log("Cleaning up camera on unmount"); 
+    const stream = video?.srcObject as MediaStream;
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    video.srcObject = null;
+  };
+}, [isActive, currentExerciseData]);
+
 
   // 🧍‍♂️ Mediapipe Pose detection
   useEffect(() => {
@@ -147,8 +145,15 @@ const WorkoutTracking = () => {
         minDetectionConfidence: 0.6,
         minTrackingConfidence: 0.6,
       });
-
+      let loggedOnce = false;
       pose.onResults((results: any) => {
+        if(!loggedOnce) { 
+        console.log("Pose landmarks:", results.poseLandmarks);
+         console.log("Results image:", results.image);
+
+          loggedOnce = true;
+        }
+
         if (!ctx || !canvas) return;
 
         // Clear old frame
