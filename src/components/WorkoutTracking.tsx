@@ -183,24 +183,26 @@ if (results.poseLandmarks && currentExerciseData) {
           ctx.lineWidth = 2;
 
           // Draw points
-          for (const landmark of results.poseLandmarks) {
-            const x = landmark.x * canvas.width;
-            const y = landmark.y * canvas.height;
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, 2 * Math.PI);
-            ctx.fill();
-          }
+  for (const landmark of results.poseLandmarks) {
+  const x = (1 - landmark.x) * canvas.width; // flip horizontally
+  const y = landmark.y * canvas.height;
+  ctx.beginPath();
+  ctx.arc(x, y, 4, 0, 2 * Math.PI);
+  ctx.fill();
+}
+
 
           // Optional: draw connecting lines (basic)
-          const connect = (a: number, b: number) => {
-            const pa = results.poseLandmarks[a];
-            const pb = results.poseLandmarks[b];
-            if (!pa || !pb) return;
-            ctx.beginPath();
-            ctx.moveTo(pa.x * canvas.width, pa.y * canvas.height);
-            ctx.lineTo(pb.x * canvas.width, pb.y * canvas.height);
-            ctx.stroke();
-          };
+   const connect = (a: number, b: number) => {
+  const pa = results.poseLandmarks[a];
+  const pb = results.poseLandmarks[b];
+  if (!pa || !pb) return;
+  ctx.beginPath();
+  ctx.moveTo((1 - pa.x) * canvas.width, pa.y * canvas.height);
+  ctx.lineTo((1 - pb.x) * canvas.width, pb.y * canvas.height);
+  ctx.stroke();
+};
+
 
           // Basic skeleton connections
           connect(11, 13); // Left shoulder → elbow
