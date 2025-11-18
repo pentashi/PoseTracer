@@ -19,8 +19,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getUserSettings } from "@/services/userService";
 import { auth } from "@/firebaseConfig";
 import { toast } from "sonner";
-import {exerciseCounterMap} from "@/utils/exerciseCounterMap";
-
+import { exerciseCounterMap } from "@/utils/exerciseCounterMap";
+import type {Results as PoseResults} from "@mediapipe/pose";
 // Helper function to parse sets like "3-4" into a number for rendering
 const getSetsCount = (sets: string | number | undefined): number => {
   if (!sets) return 3; // fallback
@@ -41,15 +41,18 @@ const WorkoutTracking = () => {
   const [repsCounted, setRepsCounted] = useState(0);
 
   // Fetch user settings (includes workoutPlan)
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["userSettings"],
-    queryFn: getUserSettings,
-    enabled: !!auth.currentUser,
-    onError: (err: any) => {
-      console.error("Failed to fetch workout plan:", err);
-      toast.error("Failed to load workout plan");
-    },
-  });
+const { data, isLoading, isError } = useQuery({
+  queryKey: ["userSettings"],
+  queryFn: getUserSettings,
+  enabled: !!auth.currentUser,
+ meta: {
+  onError: (err: Error) => {
+    console.error("Failed to fetch workout plan:", err);
+    toast.error("Failed to load workout plan");
+  }
+}
+});
+
   useEffect(() => {
     if (restTimer > 0) {
       const restInterval = setInterval(() => setRestTimer((t) => t - 1), 1000);
@@ -84,20 +87,19 @@ const WorkoutTracking = () => {
   const video = document.getElementById("cameraFeed") as HTMLVideoElement;
   if (!video) return;
 
-  const startCamera = async () => {
-    console.log("Starting camera..."); // ✅ logging
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-        audio: false,
-      });
-      video.srcObject = stream;
-      console.log("Camera started successfully"); // ✅ logging
-    } catch (err) {
-      console.error("Camera access denied:", err);
-      toast.error("Camera access is required for AI tracking.");
-    }
-  };
+const startCamera = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" },
+      audio: false,
+    });
+    video.srcObject = stream;
+    await video.play(); // explicitly await
+  } catch (err) {
+    toast.error("Camera access is required");
+  }
+};
+
 
   if (isActive) startCamera();
   else {
@@ -119,126 +121,78 @@ const WorkoutTracking = () => {
 
 
   // 🧍‍♂️ Mediapipe Pose detection
-  useEffect(() => {
-    const video = document.getElementById("cameraFeed") as HTMLVideoElement;
-    const canvas = document.getElementById("poseCanvas") as HTMLCanvasElement;
-    const ctx = canvas?.getContext("2d");
+useEffect(() => {
+  const video = document.getElementById("cameraFeed") as HTMLVideoElement;
+  const canvas = document.getElementById("poseCanvas") as HTMLCanvasElement;
+  const ctx = canvas?.getContext("2d");
 
-    if (!video || !canvas || !ctx) return;
+  if (!video || !canvas || !ctx) return;
 
-    let camera: any = null;
-    let pose: any = null;
+  let pose: any = null;
+  let raf: number | null = null;
 
-    const loadPose = async () => {
-      const { Pose } = await import("@mediapipe/pose");
-      const { Camera } = await import("@mediapipe/camera_utils");
+  const init = async () => {
+    const { Pose } = await import("@mediapipe/pose");
 
-      pose = new Pose({
-        locateFile: (file: string) =>
-          `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
-      });
+    pose = new Pose({
+      locateFile: (file: string) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+    });
 
-      pose.setOptions({
-        modelComplexity: 1,
-        smoothLandmarks: true,
-        enableSegmentation: false,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.6,
-      });
-      let loggedOnce = false;
-      pose.onResults((results: any) => {
-        if(!loggedOnce) { 
-        console.log("Pose landmarks:", results.poseLandmarks);
-         console.log("Results image:", results.image);
+    pose.setOptions({
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6,
+    });
 
-          loggedOnce = true;
+    pose.onResults((results: PoseResults) => {
+      if (!ctx) return;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.drawImage(results.image, -canvas.width, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      if (results.poseLandmarks) {
+        ctx.fillStyle = "#00ffcc";
+        ctx.strokeStyle = "#00ffff";
+        ctx.lineWidth = 2;
+
+        for (const lm of results.poseLandmarks) {
+          const x = (1 - lm.x) * canvas.width;
+          const y = lm.y * canvas.height;
+          ctx.beginPath();
+          ctx.arc(x, y, 4, 0, 2 * Math.PI);
+          ctx.fill();
         }
+      }
+    });
 
-        if (!ctx || !canvas) return;
-
-        // Clear old frame
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Draw mirrored camera image
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.drawImage(results.image, -canvas.width, 0, canvas.width, canvas.height);
-        ctx.restore();
-
-        // --- Rep Counter Logic ---
-if (results.poseLandmarks && currentExerciseData) {
-  const counterFn = exerciseCounterMap[currentExerciseData.exercise];
-
-  if (counterFn) {
-    const detectedRep = counterFn(results.poseLandmarks);
-
-    if (detectedRep) {
-      setCompletedSets((prev) => prev + 1);
-         setRepsCounted((prev) => prev + 1); 
-
-      toast.success("Rep counted!", { duration: 500 });
-    }
+    video.onloadedmetadata = () => {
+      video.play();
+const renderLoop = async () => {
+  if (video.readyState >= 2) { // HAVE_CURRENT_DATA
+    await pose.send({ image: video });
   }
-}
-
-        // Draw pose landmarks (skeleton)
-        if (results.poseLandmarks) {
-          ctx.fillStyle = "#00ffcc";
-          ctx.strokeStyle = "#00ffff";
-          ctx.lineWidth = 2;
-
-          // Draw points
-  for (const landmark of results.poseLandmarks) {
-  const x = (1 - landmark.x) * canvas.width; // flip horizontally
-  const y = landmark.y * canvas.height;
-  ctx.beginPath();
-  ctx.arc(x, y, 4, 0, 2 * Math.PI);
-  ctx.fill();
-}
-
-
-          // Optional: draw connecting lines (basic)
-   const connect = (a: number, b: number) => {
-  const pa = results.poseLandmarks[a];
-  const pb = results.poseLandmarks[b];
-  if (!pa || !pb) return;
-  ctx.beginPath();
-  ctx.moveTo((1 - pa.x) * canvas.width, pa.y * canvas.height);
-  ctx.lineTo((1 - pb.x) * canvas.width, pb.y * canvas.height);
-  ctx.stroke();
+  raf = requestAnimationFrame(renderLoop);
 };
 
-
-          // Basic skeleton connections
-          connect(11, 13); // Left shoulder → elbow
-          connect(13, 15); // Left elbow → wrist
-          connect(12, 14); // Right shoulder → elbow
-          connect(14, 16); // Right elbow → wrist
-          connect(11, 12); // Shoulders
-          connect(23, 24); // Hips
-          connect(11, 23); // Left body
-          connect(12, 24); // Right body
-        }
-      });
-
-      camera = new Camera(video, {
-        onFrame: async () => {
-          await pose.send({ image: video });
-        },
-        width: 640,
-        height: 480,
-      });
-
-      camera.start();
+      raf = requestAnimationFrame(renderLoop);
     };
+  };
 
-    if (isActive) loadPose();
+  init();
 
-    return () => {
-      if (camera) camera.stop();
-    };
-  }, [isActive]);
-
+  return () => {
+    if (raf) cancelAnimationFrame(raf);
+  };
+}, [isActive]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
