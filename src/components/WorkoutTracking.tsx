@@ -19,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getUserSettings } from "@/services/userService";
 import { auth } from "@/firebaseConfig";
 import { toast } from "sonner";
+import {exerciseCounterMap} from "@/utils/exerciseCounterMap";
 
 // Helper function to parse sets like "3-4" into a number for rendering
 const getSetsCount = (sets: string | number | undefined): number => {
@@ -37,6 +38,7 @@ const WorkoutTracking = () => {
   const [timer, setTimer] = useState(0);
   const [restTimer, setRestTimer] = useState(0);
   const [completedSets, setCompletedSets] = useState(0);
+  const [repsCounted, setRepsCounted] = useState(0);
 
   // Fetch user settings (includes workoutPlan)
   const { data, isLoading, isError } = useQuery({
@@ -75,6 +77,7 @@ const WorkoutTracking = () => {
 
   const todayWorkout = workout?.weeklySchedule?.[currentDayKey];
   const exercises = todayWorkout?.exercises || [];
+  const currentExerciseData = exercises[currentExercise];
 
   // Timer (optional continuous)
   useEffect(() => {
@@ -82,7 +85,7 @@ const WorkoutTracking = () => {
       const interval = setInterval(() => setTimer((t) => t + 1), 1000);
       return () => clearInterval(interval);
     }
-  }, [isActive]);
+  }, [isActive,currentExerciseData]);
   // 🎥 Live camera feed for AI tracking
   useEffect(() => {
     const video = document.getElementById("cameraFeed") as HTMLVideoElement;
@@ -156,6 +159,22 @@ const WorkoutTracking = () => {
         ctx.scale(-1, 1);
         ctx.drawImage(results.image, -canvas.width, 0, canvas.width, canvas.height);
         ctx.restore();
+
+        // --- Rep Counter Logic ---
+if (results.poseLandmarks && currentExerciseData) {
+  const counterFn = exerciseCounterMap[currentExerciseData.exercise];
+
+  if (counterFn) {
+    const detectedRep = counterFn(results.poseLandmarks);
+
+    if (detectedRep) {
+      setCompletedSets((prev) => prev + 1);
+         setRepsCounted((prev) => prev + 1); 
+
+      toast.success("Rep counted!", { duration: 500 });
+    }
+  }
+}
 
         // Draw pose landmarks (skeleton)
         if (results.poseLandmarks) {
@@ -282,7 +301,6 @@ const WorkoutTracking = () => {
     );
   }
 
-const currentExerciseData = exercises[currentExercise];
 
 // Total sets across all exercises (handles strings like "3-4")
 const totalSets = exercises.reduce((sum, ex) => sum + getSetsCount(ex.sets), 0);
@@ -352,6 +370,10 @@ const progress = totalSets > 0 ? (completedSetCount / totalSets) * 100 : 0;
             <h2 className="text-xl font-bold text-white">
               {currentExerciseData.exercise}
             </h2>
+
+              <span className="text-neon-green font-bold text-lg">
+      Reps: {repsCounted} / {currentExerciseData.reps}
+    </span>
             <div className="flex space-x-2">
               <Button variant="cyber" size="icon">
                 <Camera className="h-4 w-4" />
@@ -440,19 +462,20 @@ const progress = totalSets > 0 ? (completedSetCount / totalSets) * 100 : 0;
         </div>
 
         {/* Camera Section */}
-        <div className="relative w-full rounded-xl overflow-hidden border border-neon-blue/40 mb-4">
-          <video
-            id="cameraFeed"
-            className="w-full h-64 object-cover bg-black/40"
-            autoPlay
-            muted
-            playsInline
-          />
-          <canvas
-            id="poseCanvas"
-            className="absolute top-0 left-0 w-full h-full"
-          ></canvas>
-        </div>
+    <div className="relative w-full rounded-xl overflow-hidden border border-neon-blue/40 mb-4">
+  <video
+    id="cameraFeed"
+    className="w-full h-[480px] object-cover bg-black/40"
+    autoPlay
+    muted
+    playsInline
+  />
+  <canvas
+    id="poseCanvas"
+    className="absolute top-0 left-0 w-full h-full"
+  ></canvas>
+</div>
+
 
         {/* Form metrics */}
         <div className="flex items-center justify-between mb-4">
