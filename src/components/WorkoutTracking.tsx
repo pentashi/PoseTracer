@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState,useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -20,7 +20,8 @@ import { getUserSettings } from "@/services/userService";
 import { auth } from "@/firebaseConfig";
 import { toast } from "sonner";
 import { exerciseCounterMap } from "@/utils/exerciseCounterMap";
-import type {Results as PoseResults} from "@mediapipe/pose";
+import {Pose} from "@mediapipe/pose";
+import type { Results as PoseResults } from "@mediapipe/pose";
 // Helper function to parse sets like "3-4" into a number for rendering
 const getSetsCount = (sets: string | number | undefined): number => {
   if (!sets) return 3; // fallback
@@ -83,114 +84,88 @@ const { data, isLoading, isError } = useQuery({
   const currentExerciseData = exercises[currentExercise];
 
   // Timer (optional continuous)
-  useEffect(() => {
-  const video = document.getElementById("cameraFeed") as HTMLVideoElement;
-  if (!video) return;
-
-const startCamera = async () => {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" },
-      audio: false,
-    });
-    video.srcObject = stream;
-    await video.play(); // explicitly await
-  } catch (err) {
-    toast.error("Camera access is required");
-  }
-};
-
-
-  if (isActive) startCamera();
-  else {
-    console.log("Pausing camera"); // ✅ logging
-    const stream = video.srcObject as MediaStream;
-    if (stream) {
-      stream.getTracks().forEach((t) => t.stop());
-      video.srcObject = null;
-    }
-  }
-
-  return () => {
-    console.log("Cleaning up camera on unmount"); 
-    const stream = video?.srcObject as MediaStream;
-    if (stream) stream.getTracks().forEach((t) => t.stop());
-    video.srcObject = null;
-  };
-}, [isActive, currentExerciseData]);
-
-
+  
   // 🧍‍♂️ Mediapipe Pose detection
+const videoRef = useRef<HTMLVideoElement>(null);
+const canvasRef = useRef<HTMLCanvasElement>(null);
+const poseRef = useRef<Pose | null>(null);
+const rafRef = useRef<number | null>(null);
 useEffect(() => {
-  const video = document.getElementById("cameraFeed") as HTMLVideoElement;
-  const canvas = document.getElementById("poseCanvas") as HTMLCanvasElement;
-  const ctx = canvas?.getContext("2d");
+  let isMounted = true;
 
-  if (!video || !canvas || !ctx) return;
+  const setup = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
 
-  let pose: any = null;
-  let raf: number | null = null;
+    // Start camera
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    videoRef.current.srcObject = stream;
+    await videoRef.current.play();
 
-  const init = async () => {
-    const { Pose } = await import("@mediapipe/pose");
+    // Init Pose
+   poseRef.current = new Pose({
+  locateFile: (file) =>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+});
 
-    pose = new Pose({
-      locateFile: (file: string) =>
-        `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
-    });
 
-    pose.setOptions({
-      modelComplexity: 1,
+    poseRef.current.setOptions({
+      modelComplexity: 0,
       smoothLandmarks: true,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5,
     });
 
-    pose.onResults((results: PoseResults) => {
-      if (!ctx) return;
+    const ctx = canvasRef.current.getContext("2d");
+    if (!ctx) return;
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+    poseRef.current.onResults((results: PoseResults) => {
+      if (!isMounted) return;
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      canvasRef.current!.width = videoRef.current!.videoWidth;
+      canvasRef.current!.height = videoRef.current!.videoHeight;
+      ctx.clearRect(0, 0, canvasRef.current!.width, canvasRef.current!.height);
 
-      ctx.save();
-      ctx.scale(-1, 1);
-      ctx.drawImage(results.image, -canvas.width, 0, canvas.width, canvas.height);
-      ctx.restore();
+      ctx.drawImage(
+        results.image,
+        0,
+        0,
+        canvasRef.current!.width,
+        canvasRef.current!.height
+      );
 
-      if (results.poseLandmarks) {
-        ctx.fillStyle = "#00ffcc";
-        ctx.strokeStyle = "#00ffff";
-        ctx.lineWidth = 2;
+      if (!results.poseLandmarks) return;
 
-        for (const lm of results.poseLandmarks) {
-          const x = (1 - lm.x) * canvas.width;
-          const y = lm.y * canvas.height;
-          ctx.beginPath();
-          ctx.arc(x, y, 4, 0, 2 * Math.PI);
-          ctx.fill();
-        }
+      ctx.fillStyle = "#00ffcc";
+      for (const lm of results.poseLandmarks) {
+        const x = (1 - lm.x) * canvasRef.current!.width;
+        const y = lm.y * canvasRef.current!.height;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.fill();
       }
     });
 
-    video.onloadedmetadata = () => {
-      video.play();
-const renderLoop = async () => {
-  if (video.readyState >= 2) { // HAVE_CURRENT_DATA
-    await pose.send({ image: video });
-  }
-  raf = requestAnimationFrame(renderLoop);
-};
-
-      raf = requestAnimationFrame(renderLoop);
+    // Continuous render loop
+    const loop = () => {
+      if (isActive && videoRef.current!.readyState >= 2) {
+        poseRef.current!.send({ image: videoRef.current!, flipHorizontal: true });
+      }
+      rafRef.current = requestAnimationFrame(loop);
     };
+    rafRef.current = requestAnimationFrame(loop);
   };
 
-  init();
+  setup();
 
   return () => {
-    if (raf) cancelAnimationFrame(raf);
+    isMounted = false;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    poseRef.current?.close();
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream)
+        .getTracks()
+        .forEach((t) => t.stop());
+    }
   };
 }, [isActive]);
 
@@ -423,19 +398,21 @@ const progress = totalSets > 0 ? (completedSetCount / totalSets) * 100 : 0;
         </div>
 
         {/* Camera Section */}
-    <div className="relative w-full rounded-xl overflow-hidden border border-neon-blue/40 mb-4">
+   <div className="relative w-full rounded-xl overflow-hidden border border-neon-blue/40 mb-4">
   <video
-    id="cameraFeed"
+    ref={videoRef}
     className="w-full h-[480px] object-cover bg-black/40"
     autoPlay
     muted
     playsInline
   />
   <canvas
-    id="poseCanvas"
+    ref={canvasRef}
     className="absolute top-0 left-0 w-full h-full"
   ></canvas>
 </div>
+
+
 
 
         {/* Form metrics */}
