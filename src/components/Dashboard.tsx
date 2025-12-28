@@ -8,17 +8,23 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getUserSettings } from "@/services/userService";
 import { auth } from "@/firebaseConfig";
+import { useAuth } from "@/context/AuthContext";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user, loading, isDemo } = useAuth();
 
+  // Read Firestore userSettings if not demo
   const { data: userSettings, isLoading } = useQuery({
     queryKey: ["userSettings"],
     queryFn: getUserSettings,
-    enabled: !!auth.currentUser,
+    enabled: !!auth.currentUser && !isDemo,
   });
 
-  const userName = userSettings?.name ?? "User";
+  // Demo profile from localStorage
+  const demoProfile = isDemo ? JSON.parse(localStorage.getItem("demoProfile") || "{}") : {};
+
+  const userName = isDemo ? demoProfile.name || "Demo User" : userSettings?.name ?? "User";
 
   const recentMessages = [
     {
@@ -49,6 +55,11 @@ const Dashboard = () => {
               Welcome back, <span className="text-neon-purple">{userName}</span>
             </h1>
             <p className="text-neon-blue">Your AI coach is ready to optimize your workout</p>
+            {isDemo && demoProfile.goal && (
+              <p className="text-neon-green mt-1 text-sm">
+                Goal: <strong>{demoProfile.goal}</strong>
+              </p>
+            )}
           </div>
         </div>
       </div>

@@ -22,6 +22,31 @@ import { toast } from "sonner";
 import { exerciseCounterMap } from "@/utils/exerciseCounterMap";
 import {Pose} from "@mediapipe/pose";
 import type { Results as PoseResults } from "@mediapipe/pose";
+
+
+// --- DEMO WORKOUT ---
+const dummyWorkout = {
+  weeklySchedule: {
+    day1: {
+      focus: "Full Body Strength",
+      exercises: [
+        { exercise: "Push Ups", reps: 12, sets: 3, rest: "60s" },
+        { exercise: "Squats", reps: 15, sets: 3, rest: "60s" },
+        { exercise: "Plank", reps: 1, sets: 3, rest: "45s" },
+      ],
+    },
+    day2: {
+      focus: "Cardio & Core",
+      exercises: [
+        { exercise: "Jumping Jacks", reps: 30, sets: 3, rest: "30s" },
+        { exercise: "Mountain Climbers", reps: 20, sets: 3, rest: "30s" },
+      ],
+    },
+    // You can add day3–day7 similarly if needed
+  },
+};
+
+
 // Helper function to parse sets like "3-4" into a number for rendering
 const getSetsCount = (sets: string | number | undefined): number => {
   if (!sets) return 3; // fallback
@@ -40,6 +65,9 @@ const WorkoutTracking = () => {
   const [restTimer, setRestTimer] = useState(0);
   const [completedSets, setCompletedSets] = useState(0);
   const [repsCounted, setRepsCounted] = useState(0);
+  const isDemo = !auth.currentUser;
+
+
 
   // Fetch user settings (includes workoutPlan)
 const { data, isLoading, isError } = useQuery({
@@ -61,7 +89,9 @@ const { data, isLoading, isError } = useQuery({
     }
   }, [restTimer]);
 
-  const workout = data?.workoutPlan;
+const workout = isDemo
+  ? dummyWorkout
+  : data?.workoutPlan;
 
   // 🧠 Determine current day (maps Firestore day1–day7)
   const currentDayKey = useMemo(() => {
@@ -222,8 +252,9 @@ useEffect(() => {
 
   if (isLoading)
     return <p className="text-white text-center mt-12">Loading workout plan...</p>;
-  if (isError || !workout)
-    return <p className="text-red-400 text-center mt-12">No workout plan found</p>;
+  if (!isDemo && (isError || !workout))
+  return <p className="text-red-400 text-center mt-12">No workout plan found</p>;
+
   if (!todayWorkout || todayWorkout.exercises?.length === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-cyber-darker to-background">

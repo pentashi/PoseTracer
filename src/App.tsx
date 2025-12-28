@@ -13,6 +13,7 @@ import Goals from "./components/Goals";
 import ProgressAnalytics from "./components/ProgressAnalytics";
 import WorkoutTracking from "./components/WorkoutTracking";
 import Settings from "./components/Settings";
+import SettingsDemo from "./components/SettingsDemo"; // demo version
 
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -24,10 +25,16 @@ import Onboarding from "./pages/Onboarding";
 import ProtectedLayout from "./components/ProtectedLayout";
 
 // Auth
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import RequireAuth from "@/components/RequireAuth";
 
 const queryClient = new QueryClient();
+
+// Wrapper to choose demo or real settings
+const SettingsWrapper: React.FC = () => {
+  const { isDemo } = useAuth();
+  return isDemo ? <SettingsDemo /> : <Settings />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -75,7 +82,7 @@ const App = () => (
               <Route path="/goals" element={<Goals />} />
               <Route path="/progress" element={<ProgressAnalytics />} />
               <Route path="/workout" element={<WorkoutTracking />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/settings" element={<SettingsWrapper />} />
             </Route>
 
             {/* Catch-all */}
