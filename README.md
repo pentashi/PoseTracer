@@ -130,7 +130,4 @@ Include:
 - Impact assessment
 - Suggested remediation (if available)
 
-Do not open public issues for undisclosed security vulnerabilities.
 
-## License
-No license file is currently present in this repository. Treat all rights as reserved unless a license is added.
