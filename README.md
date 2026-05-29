@@ -1,157 +1,136 @@
-PoseTracer — The AI Fitness Training OS
+# PoseTracer
+AI-powered web application for personalized workout planning, tracking, and coaching.
 
-PoseTracer is a next-generation, AI-powered fitness platform designed to deliver hyper-personalized training plans, real-time workout tracking, and intelligent progression — all wrapped in a clean, cyber-modern experience.
+![Build](https://img.shields.io/badge/build-passing-brightgreen)
+![Version](https://img.shields.io/badge/version-0.0.0-blue)
+![License](https://img.shields.io/badge/license-not%20specified-lightgrey)
+![Coverage](https://img.shields.io/badge/coverage-not%20configured-lightgrey)
 
-Built for performance. Engineered for scale. Designed to impress.
+## Overview
+PoseTracer delivers a production-oriented fitness web app that combines onboarding, workout planning, progress tracking, and AI coaching in one interface.
 
-🚀 Product Overview
+It exists to replace static workout plans with adaptive, user-specific training workflows backed by Firebase and a companion AI backend.
 
-PoseTracer uses advanced AI models to generate individualized workout plans based on the user’s goals, experience, injuries, equipment access, schedule, and training preferences.
+It is for engineering teams building or evaluating AI-enabled fitness products that require:
+- Account-based user sessions
+- Persistent training data
+- Interactive coaching UX
 
-The platform blends:
+## Key Features
+- Generate personalized training flows from user onboarding context
+- Track workouts and progression over time
+- Manage goals and profile settings in authenticated sessions
+- Use AI chat workflows with persisted conversation history
+- Run a modular React + TypeScript frontend with Firebase integration
 
-Precision-personalized programming
+## Architecture Overview
+```text
+[React + Vite Frontend]
+  ├─ Auth/session state (Firebase Auth)
+  ├─ User/workout data (Firestore)
+  ├─ Media storage (Firebase Storage)
+  └─ AI chat UI
+       └─ HTTP API (localhost:4000)
+            ├─ POST /chat
+            ├─ GET /chat-history
+            └─ POST /clear-chat
+```
 
-Real-time exercise tracking
+## Prerequisites
+- Node.js 18+ (Node.js 20 LTS recommended)
+- npm 9+
+- Firebase project with Auth, Firestore, and Storage enabled
+- AI backend service reachable from the frontend (default: `http://localhost:4000`)
 
-Adaptive progression
-
-Clean UI
-
-High-speed infrastructure
-
-This is not another generic fitness app.
-This is your AI Training OS.
-
-🛠 Tech Stack
-
-PoseTracer is built with a modern, high-performance stack:
-
-React + TypeScript
-
-Vite
-
-Tailwind CSS
-
-shadcn/ui
-
-Firebase (Auth, Firestore, Storage)
-
-Groq / LLM-based plan generation
-
-Fast, modular, and fully scalable.
-
-🔧 Development Workflow
-
-You can work on PoseTracer in whichever environment suits your speed.
-
-1. Build inside Lovable
-
-Instant edits. AI-assisted changes. Auto commits.
-
-👉 https://lovable.dev/projects/385d226e-1880-41e4-aacb-ec4565b9a247
-
-2. Local Development (Recommended for production)
-
-Ensure Node.js and npm are installed.
-(Use nvm for seamless version management: https://github.com/nvm-sh/nvm#installing-and-updating
-)
-
-# Clone the repository
-git clone <YOUR_GIT_URL>
-
-# Navigate to the project
-cd <YOUR_PROJECT_NAME>
-
-# Install dependencies
+## Installation & Quick Start
+```bash
+git clone https://github.com/pentashi/PoseTracer.git
+cd PoseTracer
 npm install
-
-# Start the development server
 npm run dev
+```
 
+Open the URL printed by Vite (typically `http://localhost:5173`).
 
-Hot reload. Instant preview. Zero friction.
+## Configuration
+Current runtime configuration lives in source (`/src/firebaseConfig.js` and `/src/components/AIChat.tsx`).
 
-3. Quick Edits on GitHub
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `FIREBASE_API_KEY` | string | Hardcoded in `src/firebaseConfig.js` | Firebase API key used by the web app. |
+| `FIREBASE_AUTH_DOMAIN` | string | `achapi-ai-fitness-coach.firebaseapp.com` | Firebase auth domain. |
+| `FIREBASE_PROJECT_ID` | string | `achapi-ai-fitness-coach` | Firebase project identifier. |
+| `FIREBASE_STORAGE_BUCKET` | string | `achapi-ai-fitness-coach.firebasestorage.app` | Firebase Storage bucket. |
+| `FIREBASE_MESSAGING_SENDER_ID` | string | `117338601600` | Firebase sender ID. |
+| `FIREBASE_APP_ID` | string | `1:117338601600:web:44f152b88bb5258d3d0e65` | Firebase app identifier. |
+| `FIREBASE_MEASUREMENT_ID` | string | `G-V8B0V56DW5` | Firebase analytics measurement ID. |
+| `AI_BACKEND_BASE_URL` | string | `http://localhost:4000` | Base URL for AI chat endpoints (`/chat`, `/chat-history`, `/clear-chat`). |
 
-Navigate to the file
+## Usage Examples
+### Start local development
+```bash
+npm run dev
+```
 
-Click the Edit (✎) icon
+### Build for production
+```bash
+npm run build
+npm run preview
+```
 
-Commit your changes
+### Read and update user settings from the app service layer
+```ts
+import { getUserSettings, updateUserSettings } from "@/services/userService";
 
-Straightforward for fast patches.
+const settings = await getUserSettings();
+await updateUserSettings({ notifications: false, trainingGoal: "strength" });
+```
 
-4. GitHub Codespaces
+## API Reference
+PoseTracer frontend currently integrates with these AI backend endpoints:
 
-Cloud dev environment with zero setup.
+| Method | Path | Purpose | Request Body |
+| --- | --- | --- | --- |
+| `GET` | `/chat-history?userId=<uid>` | Retrieve chat history for a user | None |
+| `POST` | `/chat` | Send user message and receive AI reply | `{ "message": "string", "userId": "string" }` |
+| `POST` | `/clear-chat?userId=<uid>` | Clear user chat history | None |
 
-Go to the repo home
+## Testing
+This repository does not define automated unit/integration tests yet.
 
-Click Code → Codespaces
+Current local verification commands:
+```bash
+npm run lint
+npm run build
+```
 
-Create a new environment
+## Deployment
+- Build static assets with `npm run build`
+- Serve `dist/` through your CDN or static hosting platform
+- Provision Firebase resources per environment (dev/staging/prod)
+- Configure AI backend URL per environment instead of hardcoding localhost
+- Enforce HTTPS, auth rules, and Firestore security rules before production rollout
 
-Start editing and commit normally
+## Contributing
+1. Create a branch from `main` using `feature/<short-description>` or `fix/<short-description>`.
+2. Keep changes scoped and production-safe.
+3. Run `npm run lint` and `npm run build` before opening a PR.
+4. Open a PR with:
+   - Problem statement
+   - Scope of changes
+   - Validation evidence (command output/screenshots when relevant)
+5. Address review feedback and keep history clean.
 
-Perfect for editing on the go.
+## Security
+Report vulnerabilities privately via email: `achapipentashi@gmail.com`.
 
-🌐 Deployment
+Include:
+- Affected component or file
+- Reproduction steps
+- Impact assessment
+- Suggested remediation (if available)
 
-Deployment is handled seamlessly through Lovable Hosting.
+Do not open public issues for undisclosed security vulnerabilities.
 
-Open the Lovable project
-
-Click Share → Publish
-
-Instant production deployment.
-
-Custom Domain Support
-
-You can connect your own domain directly:
-
-Project → Settings → Domains → Connect Domain
-
-Full guide:
-https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide
-
-🔥 Core Features (Already Working)
-
-✔ AI-powered personalized workout plan generation
-✔ Full weekly training breakdown
-✔ Day-by-day routines
-✔ Dynamic Today Workout screen
-✔ Set/rep tracking
-✔ Exercise progression
-✔ Firestore-backed user profiles
-✔ Clean cyber-fitness UI
-
-PoseTracer is not an idea — it’s a working product.
-
-🧭 Architecture Principles
-
-Modular utilities
-
-Clean separation of concerns
-
-Scalable plan-generation logic
-
-Strong typing via TypeScript
-
-Responsive, consistent UI design
-
-Real-time data sync with Firebase
-
-Built to grow.
-
-🏆 Vision
-
-To redefine digital fitness by combining AI intelligence, biomechanics awareness, and real-time workout tracking into a single, fluid training ecosystem.
-
-PoseTracer isn’t here to join the fitness app crowd.
-It’s here to replace them.
-
-📩 Contact / Collaboration
-
-For partnerships, collaborations, or enterprise integrations:
-Founder - achapipentashi@gmail.com
+## License
+No license file is currently present in this repository. Treat all rights as reserved unless a license is added.
